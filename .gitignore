@@ -1,0 +1,10 @@
+# env
+.env
+.venv/
+
+# python
+__pycache__/
+*.pyc
+
+# test files
+test.m4a
