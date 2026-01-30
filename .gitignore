@@ -8,3 +8,4 @@ __pycache__/
 
 # test files
 test.m4a
+.DS_Store
