@@ -1,0 +1,115 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum UploadType {
+  VOICE
+  IMAGE
+  TEXT
+}
+
+enum ScriptType {
+  CHAT
+  CALL
+}
+
+model User {
+  id        String           @id @default(uuid())
+  email     String           @unique
+  password  String
+  name      String?
+  role      UserRole         @default(USER)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  uploadedFiles   UploadedFile[]
+  experienceLogs  ExperienceLog[]
+}
+
+model UploadedFile {
+  id        String      @id @default(uuid())
+  userId    String
+  type      UploadType
+  originalName String
+  storedPath  String
+  size      Int
+  mimeType  String
+  createdAt DateTime    @default(now())
+
+  user           User           @relation(fields: [userId], references: [id])
+  extractedText  ExtractedText?
+}
+
+model ExtractedText {
+  id            String     @id @default(uuid())
+  uploadedFileId String    @unique
+  sourceType    String
+  rawText       String
+  cleanText     String
+  summary       String
+  keywords      Json
+  signals       Json
+  riskScore     Int
+  createdAt     DateTime   @default(now())
+
+  uploadedFile  UploadedFile @relation(fields: [uploadedFileId], references: [id])
+  summaryRecord Summary?
+}
+
+model Summary {
+  id             String     @id @default(uuid())
+  extractedTextId String    @unique
+  summary        String
+  keywords       Json
+  createdAt      DateTime   @default(now())
+
+  extractedText  ExtractedText @relation(fields: [extractedTextId], references: [id])
+  scripts        ExperienceScript[]
+}
+
+model ExperienceScript {
+  id        String     @id @default(uuid())
+  summaryId String
+  type      ScriptType
+  script    Json
+  createdAt DateTime   @default(now())
+
+  summary   Summary   @relation(fields: [summaryId], references: [id])
+  ttsFile   TtsFile?
+  logs      ExperienceLog[]
+
+  @@unique([summaryId, type])
+}
+
+model TtsFile {
+  id        String   @id @default(uuid())
+  scriptId  String   @unique
+  storedPath String
+  createdAt DateTime @default(now())
+
+  script    ExperienceScript @relation(fields: [scriptId], references: [id])
+  logs      ExperienceLog[]
+}
+
+model ExperienceLog {
+  id        String   @id @default(uuid())
+  userId    String
+  scriptId  String
+  ttsFileId String?
+  log       Json
+  createdAt DateTime @default(now())
+
+  user      User             @relation(fields: [userId], references: [id])
+  script    ExperienceScript @relation(fields: [scriptId], references: [id])
+  ttsFile   TtsFile?          @relation(fields: [ttsFileId], references: [id])
+}
