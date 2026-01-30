@@ -54,7 +54,7 @@ export default function ChatbotScreen() {
 
         <View style={{ height: 18 }} />
 
-        <Pressable style={styles.btn}>
+        <Pressable style={styles.btn} onPress={() => router.push("/upload")}>
           <Text style={styles.btnText}>파일 업로드하기</Text>
         </Pressable>
 
