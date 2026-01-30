@@ -55,8 +55,8 @@ export default function MessageScamScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
 
-  // ✅ 카드 위치 안 흔들리게 "픽셀 폭" 계산
-  const sidePadding = 16;
+  // ✅ 칸 분배를 퍼센트가 아니라 "픽셀"로 고정
+  const sidePadding = 16; // grid paddingHorizontal과 동일
   const gap = 14;
   const cardWidth = (width - sidePadding * 2 - gap) / 2;
 
@@ -98,12 +98,12 @@ export default function MessageScamScreen() {
       <ScrollView
         contentContainerStyle={styles.grid}
         showsVerticalScrollIndicator={false}
-        contentInsetAdjustmentBehavior="never"
       >
         {DATA.map((item) => {
           const CardInner = (
-            <View style={[styles.card, { width: cardWidth }]}>
-              {/* 썸네일 */}
+            <View
+              style={[styles.card, { width: cardWidth, marginBottom: gap }]}
+            >
               {item.image ? (
                 <ImageBackground
                   source={item.image}
@@ -115,18 +115,14 @@ export default function MessageScamScreen() {
                 <View style={styles.thumbPlaceholder} />
               )}
 
-              {/* 북마크 (카드 클릭과 겹쳐도 정상 동작) */}
               <Pressable
                 style={styles.bookmarkBtn}
                 hitSlop={8}
-                onPress={() => {
-                  // 북마크 기능 나중에 넣기 (지금은 동작만 막아둠)
-                }}
+                onPress={() => {}}
               >
                 <Text style={styles.bookmarkIcon}>🔖</Text>
               </Pressable>
 
-              {/* 텍스트 */}
               <Text style={styles.cardTitle}>{item.title}</Text>
               <Text style={styles.cardMeta}>
                 {item.reports} · {item.time}
@@ -143,15 +139,13 @@ export default function MessageScamScreen() {
             );
           }
 
-          // 나머지 카드는 일단 클릭 없음 (원하면 나중에 라우트 추가)
+          // 나머지는 일단 이동 없음
           return (
             <Pressable key={item.id} onPress={() => {}}>
               {CardInner}
             </Pressable>
           );
         })}
-
-        <View style={{ height: 30 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -207,7 +201,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     flexDirection: "row",
     flexWrap: "wrap",
-    // ✅ 카드 간격을 우리가 직접 고정
     justifyContent: "space-between",
   },
 
@@ -216,7 +209,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#EFEFEF",
     borderRadius: 18,
     overflow: "hidden",
-    marginBottom: 14,
   },
 
   thumb: { width: "100%", height: 130 },

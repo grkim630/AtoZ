@@ -19,8 +19,8 @@ type CrimeCard = { id: string; image?: ImageSourcePropType };
 const mockCards: CrimeCard[] = [
   { id: "1", image: require("../../assets/images/trend1.png") },
   { id: "2", image: require("../../assets/images/trend2.png") },
-  { id: "3" },
-  { id: "4" },
+  { id: "3", image: require("../../assets/images/used-trade.png") },
+  { id: "4", image: require("../../assets/images/court-paper.png") },
 ];
 
 export default function HomeScreen() {
@@ -200,8 +200,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.25)",
   },
   bigCardCenterText: {
-    color: "#fff",
-    fontSize: 20,
+    color: "#ebebeb",
+    fontSize: 40,
     fontWeight: "500",
   },
 

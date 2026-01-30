@@ -10,6 +10,21 @@ import {
   View,
 } from "react-native";
 
+// ✅ 카드 이미지들 (원하는 이미지로 바꿔도 됨)
+const SAVED = [
+  require("../../assets/images/police-call.png"),
+  require("../../assets/images/court-paper.png"),
+  require("../../assets/images/used-trade.png"),
+  require("../../assets/images/child-scam.png"),
+];
+
+const WATCHED = [
+  require("../../assets/images/court-paper.png"),
+  require("../../assets/images/used-trade.png"),
+  require("../../assets/images/police-call.png"),
+  require("../../assets/images/child-scam.png"),
+];
+
 export default function ExploreScreen() {
   const router = useRouter();
 
@@ -34,7 +49,6 @@ export default function ExploreScreen() {
       >
         {/* 프로필 영역 */}
         <View style={styles.profileRow}>
-          {/* 🔵 파란 원 + chatbot-eyes 아이콘 */}
           <View style={styles.avatarCircle}>
             <Image
               source={require("../../assets/images/chatbot-eyes.png")}
@@ -62,20 +76,45 @@ export default function ExploreScreen() {
 
         {/* 저장한 영상 */}
         <Text style={styles.sectionTitle}>저장한 영상</Text>
-        <View style={styles.cardsRow}>
-          <View style={styles.card} />
-          <View style={styles.card} />
-          <View style={styles.card} />
-        </View>
+
+        {/* ✅ 가로 스크롤로 변경 */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.hList}
+        >
+          {SAVED.map((src, idx) => (
+            <Pressable key={`saved-${idx}`} style={styles.card}>
+              <Image source={src} style={styles.cardImg} resizeMode="cover" />
+              <Pressable style={styles.bookmarkBtn} hitSlop={8}>
+                <Text style={styles.bookmarkIcon}>🔖</Text>
+              </Pressable>
+            </Pressable>
+          ))}
+          <View style={{ width: 6 }} />
+        </ScrollView>
 
         <View style={styles.divider} />
 
         {/* 이미 시청했어요 */}
         <Text style={styles.sectionTitle}>이미 시청했어요</Text>
-        <View style={styles.cardsRow}>
-          <View style={styles.card} />
-          <View style={styles.card} />
-        </View>
+
+        {/* ✅ 가로 스크롤로 변경 */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.hList}
+        >
+          {WATCHED.map((src, idx) => (
+            <Pressable key={`watched-${idx}`} style={styles.card}>
+              <Image source={src} style={styles.cardImg} resizeMode="cover" />
+              <Pressable style={styles.bookmarkBtn} hitSlop={8}>
+                <Text style={styles.bookmarkIcon}>🔖</Text>
+              </Pressable>
+            </Pressable>
+          ))}
+          <View style={{ width: 6 }} />
+        </ScrollView>
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -125,12 +164,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: 14,
+    overflow: "hidden",
   },
 
-  /* 🔥 여기서 눈 아이콘 크기 조절 */
-  profileEyeImage: {
-    width: 54,
-    height: 36,
+  eyeImage: {
+    width: 230, // ✅ 원래 230이라 너무 큼 → 프로필용으로 적당히
+    height: 130,
   },
 
   profileInfo: { flex: 1 },
@@ -175,10 +214,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  cardsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 14,
+  // ✅ 가로 리스트 컨테이너
+  hList: {
+    paddingRight: 8,
+    gap: 14, // 카드 사이 간격
   },
 
   card: {
@@ -186,15 +225,31 @@ const styles = StyleSheet.create({
     height: 210,
     borderRadius: 22,
     backgroundColor: "#EFEFEF",
+    overflow: "hidden",
   },
+
+  // ✅ 카드 이미지 꽉 채우기
+  cardImg: {
+    width: "100%",
+    height: "100%",
+  },
+
+  bookmarkBtn: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(255,255,255,0.95)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bookmarkIcon: { fontSize: 18 },
 
   divider: {
     height: 1,
     backgroundColor: "rgba(0,0,0,0.2)",
     marginVertical: 22,
-  },
-  eyeImage: {
-    width: 230,
-    height: 130,
   },
 });

@@ -143,8 +143,6 @@ export default function PhoneScreen() {
             </Text>
           </Pressable>
         ))}
-
-        <View style={{ height: 30 }} />
       </ScrollView>
     </SafeAreaView>
   );
