@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import React from "react";
 import {
   ImageBackground,
@@ -9,6 +9,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 
 type Card = {
@@ -52,6 +53,12 @@ const DATA: Card[] = [
 
 export default function MessageScamScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+
+  // ✅ 카드 위치 안 흔들리게 "픽셀 폭" 계산
+  const sidePadding = 16;
+  const gap = 14;
+  const cardWidth = (width - sidePadding * 2 - gap) / 2;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -79,7 +86,7 @@ export default function MessageScamScreen() {
       <View style={styles.searchWrap}>
         <View style={styles.searchBar}>
           <TextInput
-            placeholder="검찰청에서 전화가 걸려 왔어요."
+            placeholder="메세지에서 이상한 요구가 왔어요."
             placeholderTextColor="#9CA3AF"
             style={styles.searchInput}
           />
@@ -91,30 +98,58 @@ export default function MessageScamScreen() {
       <ScrollView
         contentContainerStyle={styles.grid}
         showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="never"
       >
-        {DATA.map((item) => (
-          <Pressable key={item.id} style={styles.card}>
-            {item.image ? (
-              <ImageBackground
-                source={item.image}
-                style={styles.thumb}
-                imageStyle={styles.thumbImg}
-                resizeMode="cover"
-              />
-            ) : (
-              <View style={styles.thumbPlaceholder} />
-            )}
+        {DATA.map((item) => {
+          const CardInner = (
+            <View style={[styles.card, { width: cardWidth }]}>
+              {/* 썸네일 */}
+              {item.image ? (
+                <ImageBackground
+                  source={item.image}
+                  style={styles.thumb}
+                  imageStyle={styles.thumbImg}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={styles.thumbPlaceholder} />
+              )}
 
-            <Pressable style={styles.bookmarkBtn} hitSlop={8}>
-              <Text style={styles.bookmarkIcon}>🔖</Text>
+              {/* 북마크 (카드 클릭과 겹쳐도 정상 동작) */}
+              <Pressable
+                style={styles.bookmarkBtn}
+                hitSlop={8}
+                onPress={() => {
+                  // 북마크 기능 나중에 넣기 (지금은 동작만 막아둠)
+                }}
+              >
+                <Text style={styles.bookmarkIcon}>🔖</Text>
+              </Pressable>
+
+              {/* 텍스트 */}
+              <Text style={styles.cardTitle}>{item.title}</Text>
+              <Text style={styles.cardMeta}>
+                {item.reports} · {item.time}
+              </Text>
+            </View>
+          );
+
+          // ✅ 자녀 사칭만 이동
+          if (item.id === "child") {
+            return (
+              <Link key={item.id} href="/message/child" asChild>
+                <Pressable>{CardInner}</Pressable>
+              </Link>
+            );
+          }
+
+          // 나머지 카드는 일단 클릭 없음 (원하면 나중에 라우트 추가)
+          return (
+            <Pressable key={item.id} onPress={() => {}}>
+              {CardInner}
             </Pressable>
-
-            <Text style={styles.cardTitle}>{item.title}</Text>
-            <Text style={styles.cardMeta}>
-              {item.reports} · {item.time}
-            </Text>
-          </Pressable>
-        ))}
+          );
+        })}
 
         <View style={{ height: 30 }} />
       </ScrollView>
@@ -172,16 +207,16 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     flexDirection: "row",
     flexWrap: "wrap",
+    // ✅ 카드 간격을 우리가 직접 고정
     justifyContent: "space-between",
-    rowGap: 14,
   },
 
   card: {
-    width: "47%",
     height: 230,
     backgroundColor: "#EFEFEF",
     borderRadius: 18,
     overflow: "hidden",
+    marginBottom: 14,
   },
 
   thumb: { width: "100%", height: 130 },
