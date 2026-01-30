@@ -1,0 +1,12 @@
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.5
+pydantic-settings>=2.0
+python-dotenv>=1.0
+python-multipart>=0.0.7
+httpx>=0.25,<0.28
+openai>=1.50.0
+
+langchain-openai>=0.2.0
+pygame>=2.5
+SpeechRecognition>=3.10
