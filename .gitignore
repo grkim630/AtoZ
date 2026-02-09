@@ -163,6 +163,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
+extracted-text-py/.venv
 env/
 venv/
 ENV/
