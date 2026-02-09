@@ -12,21 +12,21 @@ import { CreateSessionMessageDto } from "./dto/create-session-message.dto";
 import { EvaluateSessionDto } from "./dto/evaluate-session.dto";
 import { SubmitSessionSurveyDto } from "./dto/submit-session-survey.dto";
 import {
-  buildEducationMessage,
-  buildEvaluationCategories,
   clampScore,
-  computeBehaviorScore,
-  computeConfidence,
   computeFinalCategoryScore,
   computeOverallScore,
   computeSurveyScore,
   tipByCategory,
   toLabel,
 } from "./sessions-scoring";
+import { SessionEvaluatorService } from "./session-evaluator.service";
 
 @Injectable()
 export class SessionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sessionEvaluatorService: SessionEvaluatorService,
+  ) {}
 
   async createSession(userId: string, dto: CreateSessionDto) {
     const script = await this.prisma.experienceScript.findUnique({
@@ -94,31 +94,48 @@ export class SessionsService {
   }
 
   async evaluateSession(userId: string, sessionId: string, dto: EvaluateSessionDto) {
-    await this.getOwnedSession(userId, sessionId);
-    const events = await this.prisma.sessionActionEvent.findMany({
-      where: { sessionId },
-      orderBy: { timestamp: "asc" },
-    });
-    const messages = await this.prisma.sessionMessageLog.count({ where: { sessionId } });
+    const session = await this.getOwnedSession(userId, sessionId);
+    const [events, messageLogs] = await Promise.all([
+      this.prisma.sessionActionEvent.findMany({
+        where: { sessionId },
+        orderBy: { timestamp: "asc" },
+      }),
+      this.prisma.sessionMessageLog.findMany({
+        where: { sessionId },
+        orderBy: { turnIndex: "asc" },
+      }),
+    ]);
 
-    const behaviorBase = computeBehaviorScore(events.map((event) => event.riskWeight));
-    const categories = buildEvaluationCategories(behaviorBase, events.length, messages);
-    const overallScore = Math.round(
-      categories.reduce((acc, item) => acc + item.score, 0) / categories.length,
-    );
-    const confidence = computeConfidence(events.length, messages);
+    const evaluated = await this.sessionEvaluatorService.evaluate({
+      scriptType: session.script.type,
+      scriptContent:
+        typeof session.script.script === "string"
+          ? session.script.script
+          : JSON.stringify(session.script.script),
+      messageLogs: messageLogs.map((message) => ({
+        speaker: message.speaker,
+        text: message.text,
+        maskedText: message.maskedText,
+      })),
+      actionEvents: events.map((event) => ({
+        eventType: event.eventType,
+        actionCode: event.actionCode,
+        riskWeight: event.riskWeight,
+        stepNo: event.stepNo,
+      })),
+      promptVersion: dto.promptVersion ?? "v1",
+      model: dto.model ?? "gpt-4o-mini",
+    });
 
     const outputJson = {
-      overallScore,
-      confidence,
-      categories: categories.map((category) => ({
-        categoryCode: category.categoryCode,
-        score: category.score,
-        label: category.label,
-        evidence: category.evidence,
-        riskFlags: category.riskFlags,
-      })),
-      educationMessage: buildEducationMessage(categories),
+      overallScore: evaluated.overallScore,
+      confidence: evaluated.confidence,
+      categories: evaluated.categories,
+      educationMessage: evaluated.educationMessage,
+      meta: {
+        mode: evaluated.mode,
+        modelUsed: evaluated.modelUsed,
+      },
     };
 
     const evaluation = await this.prisma.llmBehaviorEvaluation.upsert({
@@ -126,17 +143,17 @@ export class SessionsService {
       create: {
         sessionId,
         promptVersion: dto.promptVersion ?? "v1",
-        model: dto.model ?? "mock-evaluator",
+        model: evaluated.modelUsed,
         outputJson,
-        overallScore,
-        confidence,
+        overallScore: evaluated.overallScore,
+        confidence: evaluated.confidence,
       },
       update: {
         promptVersion: dto.promptVersion ?? "v1",
-        model: dto.model ?? "mock-evaluator",
+        model: evaluated.modelUsed,
         outputJson,
-        overallScore,
-        confidence,
+        overallScore: evaluated.overallScore,
+        confidence: evaluated.confidence,
         createdAt: new Date(),
       },
     });
@@ -276,7 +293,14 @@ export class SessionsService {
   private async getOwnedSession(userId: string, sessionId: string) {
     const session = await this.prisma.experienceSession.findUnique({
       where: { id: sessionId },
-      select: { id: true, userId: true },
+      include: {
+        script: {
+          select: {
+            type: true,
+            script: true,
+          },
+        },
+      },
     });
     if (!session) {
       throw new NotFoundException("Session not found");
