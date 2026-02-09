@@ -12,6 +12,7 @@ import { ScriptsModule } from "./scripts/scripts.module";
 import { TtsModule } from "./tts/tts.module";
 import { LogsModule } from "./logs/logs.module";
 import { ExperienceModule } from "./experience/experience.module";
+import { SessionsModule } from "./sessions/sessions.module";
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ExperienceModule } from "./experience/experience.module";
     TtsModule,
     LogsModule,
     ExperienceModule,
+    SessionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
