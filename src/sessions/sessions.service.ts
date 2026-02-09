@@ -4,21 +4,25 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { CategoryCode, ScoreLabel, SessionStatus } from "@prisma/client";
+import { CategoryCode, SessionStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateSessionDto } from "./dto/create-session.dto";
 import { CreateSessionEventDto } from "./dto/create-session-event.dto";
 import { CreateSessionMessageDto } from "./dto/create-session-message.dto";
 import { EvaluateSessionDto } from "./dto/evaluate-session.dto";
 import { SubmitSessionSurveyDto } from "./dto/submit-session-survey.dto";
-
-type EvaluationCategory = {
-  categoryCode: CategoryCode;
-  score: number;
-  label: ScoreLabel;
-  evidence: string[];
-  riskFlags: string[];
-};
+import {
+  buildEducationMessage,
+  buildEvaluationCategories,
+  clampScore,
+  computeBehaviorScore,
+  computeConfidence,
+  computeFinalCategoryScore,
+  computeOverallScore,
+  computeSurveyScore,
+  tipByCategory,
+  toLabel,
+} from "./sessions-scoring";
 
 @Injectable()
 export class SessionsService {
@@ -97,12 +101,12 @@ export class SessionsService {
     });
     const messages = await this.prisma.sessionMessageLog.count({ where: { sessionId } });
 
-    const behaviorBase = this.computeBehaviorScore(events.map((event) => event.riskWeight));
-    const categories = this.buildEvaluationCategories(behaviorBase, events.length, messages);
-    const overallScore = this.round(
+    const behaviorBase = computeBehaviorScore(events.map((event) => event.riskWeight));
+    const categories = buildEvaluationCategories(behaviorBase, events.length, messages);
+    const overallScore = Math.round(
       categories.reduce((acc, item) => acc + item.score, 0) / categories.length,
     );
-    const confidence = this.computeConfidence(events.length, messages);
+    const confidence = computeConfidence(events.length, messages);
 
     const outputJson = {
       overallScore,
@@ -114,7 +118,7 @@ export class SessionsService {
         evidence: category.evidence,
         riskFlags: category.riskFlags,
       })),
-      educationMessage: this.buildEducationMessage(categories),
+      educationMessage: buildEducationMessage(categories),
     };
 
     const evaluation = await this.prisma.llmBehaviorEvaluation.upsert({
@@ -180,18 +184,20 @@ export class SessionsService {
       confidence?: number;
     };
     const categories = output.categories ?? [];
-    const surveyScore = this.computeSurveyScore(survey?.answersJson ?? null, survey?.isSkipped ?? true);
+    const surveyScore = computeSurveyScore(
+      survey?.answersJson ?? null,
+      survey?.isSkipped ?? true,
+    );
 
     for (const category of categories) {
-      const behaviorScore = this.round(Math.max(0, Math.min(100, category.score - 5)));
-      const llmScore = this.round(Math.max(0, Math.min(100, category.score)));
-      const finalScore =
-        surveyScore === null
-          ? this.round(0.7 * behaviorScore + 0.3 * llmScore)
-          : this.round(0.6 * behaviorScore + 0.25 * llmScore + 0.15 * surveyScore);
-
-      const adjusted = (output.confidence ?? 1) < 0.55 ? finalScore - 10 : finalScore;
-      const safeScore = Math.max(0, adjusted);
+      const behaviorScore = clampScore(category.score - 5);
+      const llmScore = clampScore(category.score);
+      const safeScore = computeFinalCategoryScore(
+        behaviorScore,
+        llmScore,
+        surveyScore,
+        output.confidence ?? 1,
+      );
 
       await this.prisma.sessionCategoryScore.upsert({
         where: {
@@ -207,14 +213,14 @@ export class SessionsService {
           llmScore,
           surveyScore,
           finalScore: safeScore,
-          label: this.toLabel(safeScore),
+          label: toLabel(safeScore),
         },
         update: {
           behaviorScore,
           llmScore,
           surveyScore,
           finalScore: safeScore,
-          label: this.toLabel(safeScore),
+          label: toLabel(safeScore),
         },
       });
     }
@@ -248,28 +254,16 @@ export class SessionsService {
       throw new NotFoundException("Result not found. Run finalize first.");
     }
 
-    const weightByCategory: Record<CategoryCode, number> = {
-      [CategoryCode.DETECT_SIGNAL]: 0.3,
-      [CategoryCode.REFUSE_REQUEST]: 0.3,
-      [CategoryCode.VERIFY_IDENTITY]: 0.25,
-      [CategoryCode.REPORTING]: 0.15,
-    };
-
-    const overallScore = this.round(
-      scores.reduce(
-        (acc, score) => acc + score.finalScore * weightByCategory[score.categoryCode],
-        0,
-      ),
-    );
+    const overallScore = computeOverallScore(scores);
 
     const weakest = [...scores].sort((a, b) => a.finalScore - b.finalScore).slice(0, 2);
-    const tips = weakest.map((item) => this.tipByCategory(item.categoryCode));
+    const tips = weakest.map((item) => tipByCategory(item.categoryCode));
 
     return {
       sessionId: session.id,
       status: session.status,
       overallScore,
-      label: this.toLabel(overallScore),
+      label: toLabel(overallScore),
       categories: scores,
       evaluationSummary: {
         confidence: evaluation?.confidence ?? null,
@@ -291,91 +285,5 @@ export class SessionsService {
       throw new ForbiddenException("You do not have access to this session");
     }
     return session;
-  }
-
-  private computeBehaviorScore(riskWeights: number[]) {
-    const score = 50 - riskWeights.reduce((acc, weight) => acc + weight * 20, 0);
-    return Math.max(0, Math.min(100, this.round(score)));
-  }
-
-  private computeConfidence(eventCount: number, messageCount: number) {
-    const raw = 0.4 + Math.min(0.3, eventCount * 0.05) + Math.min(0.3, messageCount * 0.03);
-    return Math.min(0.98, this.round(raw * 100) / 100);
-  }
-
-  private buildEvaluationCategories(
-    behaviorBase: number,
-    eventCount: number,
-    messageCount: number,
-  ): EvaluationCategory[] {
-    const signalBonus = Math.min(10, messageCount * 2);
-    const reportingBonus = eventCount > 0 ? 5 : 0;
-
-    const categoryScores: Array<[CategoryCode, number]> = [
-      [CategoryCode.DETECT_SIGNAL, behaviorBase + signalBonus],
-      [CategoryCode.REFUSE_REQUEST, behaviorBase],
-      [CategoryCode.VERIFY_IDENTITY, behaviorBase - 5],
-      [CategoryCode.REPORTING, behaviorBase + reportingBonus - 10],
-    ];
-
-    return categoryScores.map(([categoryCode, raw]) => {
-      const score = Math.max(0, Math.min(100, this.round(raw)));
-      return {
-        categoryCode,
-        score,
-        label: this.toLabel(score),
-        evidence: [`행동 로그 기반 점수 ${score}점`, `이벤트 ${eventCount}개 반영`],
-        riskFlags: score < 60 ? ["추가 학습 권장"] : [],
-      };
-    });
-  }
-
-  private buildEducationMessage(categories: EvaluationCategory[]) {
-    const weak = [...categories].sort((a, b) => a.score - b.score)[0];
-    return {
-      summary: `${weak.categoryCode} 역량 보강이 필요합니다.`,
-      tips: [this.tipByCategory(weak.categoryCode)],
-    };
-  }
-
-  private computeSurveyScore(answersJson: unknown, isSkipped: boolean) {
-    if (isSkipped || !answersJson || typeof answersJson !== "object") {
-      return null;
-    }
-    const obj = answersJson as Record<string, unknown>;
-    const keys = ["realism", "helpfulness", "confidence"];
-    const values = keys
-      .map((key) => obj[key])
-      .filter((value): value is number => typeof value === "number");
-    if (values.length === 0) {
-      return null;
-    }
-    const avg = values.reduce((acc, value) => acc + value, 0) / values.length;
-    return this.round(((avg - 1) / 4) * 100);
-  }
-
-  private toLabel(score: number): ScoreLabel {
-    if (score >= 90) return ScoreLabel.A;
-    if (score >= 75) return ScoreLabel.B;
-    if (score >= 60) return ScoreLabel.C;
-    if (score >= 40) return ScoreLabel.D;
-    return ScoreLabel.E;
-  }
-
-  private tipByCategory(category: CategoryCode) {
-    if (category === CategoryCode.DETECT_SIGNAL) {
-      return "긴급 요청, 금전 요구, 링크 유도 문구를 우선 의심하세요.";
-    }
-    if (category === CategoryCode.REFUSE_REQUEST) {
-      return "금전/개인정보 요청에는 즉시 거절 후 대화를 중단하세요.";
-    }
-    if (category === CategoryCode.VERIFY_IDENTITY) {
-      return "반드시 공식 연락처로 역확인하고, 발신자 정보만 믿지 마세요.";
-    }
-    return "의심 사례는 즉시 차단 후 기관 신고 절차를 수행하세요.";
-  }
-
-  private round(value: number) {
-    return Math.round(value);
   }
 }
