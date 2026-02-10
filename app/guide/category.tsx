@@ -2,8 +2,14 @@ import { Colors } from '@/src/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import React from 'react';
+// Image component removed in favor of SVG components
+// import { Image, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import DestinationIcon from '../../assets/icons/destination 1.svg';
+import SirenIcon from '../../assets/icons/siren.svg';
+import TaskIcon from '../../assets/icons/task 1.svg';
 
 /* 
   Guide Category Screen:
@@ -11,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
   Matches Image 14.22.06 ref.
 */
 
-const SelectionCard = ({ title, activeTitle, subtitle, icon, onPress }: { title: string, activeTitle: string, subtitle: string, icon: any, onPress: () => void }) => (
+const SelectionCard = ({ title, activeTitle, subtitle, IconComponent, onPress }: { title: string, activeTitle: string, subtitle: string, IconComponent: any, onPress: () => void }) => (
     <Pressable style={styles.card} onPress={onPress}>
         <View style={styles.cardHeader}>
              <Text style={styles.cardTitle}>
@@ -19,7 +25,9 @@ const SelectionCard = ({ title, activeTitle, subtitle, icon, onPress }: { title:
              </Text>
         </View>
         <View style={styles.cardBody}>
-             <Ionicons name={icon} size={48} color={Colors.primary} style={{ marginBottom: 16 }} />
+             <View style={styles.iconContainer}>
+                <IconComponent width={80} height={80} />
+             </View>
              <Text style={styles.cardSubtitle}>{subtitle}</Text>
         </View>
     </Pressable>
@@ -43,37 +51,26 @@ export default function GuideCategoryScreen() {
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.titleContainer}>
-            <Ionicons name="chatbubble" size={24} color={Colors.primary} style={{ marginBottom: 8 }} />
+            <SirenIcon width={40} height={40} style={{ marginBottom: 8 }} />
             <Text style={styles.mainTitle}>
                 피싱 범죄 <Text style={{ color: Colors.primary }}>행동 요령</Text>을{'\n'}알려드릴게요.
             </Text>
         </View>
 
         <View style={styles.cardContainer}>
-            {/* Type Response -> User didn't specify distinct destination besides "Step" flow being specific.
-                I'll allow 'Type' to go to steps_list as well for now or maybe flow?
-                Actually, the user request #1 says: "Clicking 'Crime Step Response' moves to app/guide/steps_list.tsx".
-                The user seems to imply 'Type' might go elsewhere or just wants me to implement 'Step' path.
-                I'll link both to steps list but user emphasized Step path.
-                Wait, user request #2 says "Crime Type List (app/guide/steps_list.tsx)".
-                So clicking 'Step Response' -> 'Crime Type List'?? That sounds contradictory in naming but matching flow.
-                Let's stick to the prompt: 
-                "14.22.06 -> Click 'Crime Step Response' -> app/guide/steps_list.tsx"
-            */}
             <SelectionCard 
                 title="범행" 
                 activeTitle="종류별" 
                 subtitle={`자세한 유형을\n파악하고 싶어요.`}
-                icon="list-circle" 
-                // Ensuring navigation is robust
+                IconComponent={TaskIcon}
                 onPress={() => router.push('/guide/steps_list')} 
             />
             <SelectionCard 
                 title="범행" 
                 activeTitle="단계별" 
                 subtitle={`절차별 방법을\n파악하고 싶어요.`}
-                icon="map" 
-                onPress={() => router.push('/guide/steps_list')} 
+                IconComponent={DestinationIcon}
+                onPress={() => router.push('/guide/steps')} 
             />
         </View>
 
@@ -165,6 +162,11 @@ const styles = StyleSheet.create({
       color: '#888',
       textAlign: 'center',
       lineHeight: 18,
+  },
+  iconContainer: {
+      marginBottom: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
   },
   chatButton: {
       backgroundColor: '#2B5CFF', // Main Blue

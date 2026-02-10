@@ -45,7 +45,7 @@ export default function GuideStepsListScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color="#111" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>범행 단계별 대응안</Text>
+        <Text style={styles.headerTitle}>범행 종류별 대응안</Text>
         <Ionicons name="search-outline" size={24} color="#111" />
       </View>
 

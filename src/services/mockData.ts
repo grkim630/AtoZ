@@ -76,7 +76,7 @@ export const MOCK_FEED = [
     views: 23,
     likes: 3,
     comments: 1,
-    image: 'message_screenshot_1', // Placeholder
+    image: require('../../assets/images/Rectangle 266.png'), 
   },
   {
     id: 'f2',
@@ -89,7 +89,7 @@ export const MOCK_FEED = [
     views: 39,
     likes: 2,
     comments: 3,
-    image: 'message_screenshot_2', // Placeholder
+    image: require('../../assets/images/Rectangle 277.png'),
   },
    {
     id: 'f3',

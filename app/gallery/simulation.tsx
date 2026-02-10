@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Mock Data for the scenario
@@ -74,15 +74,17 @@ export default function SimulationScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             
             {/* Background - Simulating Police Office Video Call */}
-            {/* In a real app, use an actual Image component here. Using a color placeholder for now. */}
-            <View style={styles.backgroundPlaceholder}>
+            <ImageBackground
+                source={require('../../assets/images/pol.png')}
+                style={styles.backgroundPlaceholder}
+                resizeMode="cover"
+            >
                 <LinearGradient
-                    colors={['#1a2a6c', '#b21f1f', '#fdbb2d']} // A somewhat intense gradient to simulate urgency
+                    colors={['transparent', 'rgba(0,0,0,0.7)']}
                     style={StyleSheet.absoluteFill}
                 />
-                <Ionicons name="person" size={200} color="rgba(255,255,255,0.2)" style={{ alignSelf: 'center', marginTop: 100 }} />
                 <Text style={styles.callerName}>전화 피싱</Text>
-            </View>
+            </ImageBackground>
 
             {/* Warning Banner */}
             {showWarning && (

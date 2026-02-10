@@ -2,13 +2,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
 import {
-    Animated,
-    Dimensions,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View
+  Animated,
+  Dimensions,
+  ImageBackground,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -129,13 +130,16 @@ export default function HomeScreen() {
             <Icons.Chevron.Type name={Icons.Chevron.Name} size={20} color={Colors.primary} />
         </View>
         
-        <View style={styles.crimeCard}>
-          <View style={styles.crimeImagePlaceholder} >
-             {/* Placeholder for the phone image in the design */}
-             <Icons.Image.Type name={Icons.Image.Name} size={40} color={Colors.white} />
+        <ImageBackground
+           source={require('../../assets/images/Rectangle 12.png')}
+           style={styles.crimeCard}
+           imageStyle={{ borderRadius: 16 }}
+           resizeMode="cover"
+        >
+          <View style={styles.crimeCardOverlay}>
+             <Text style={styles.crimeCardText}>실제 지인의 번호로 사칭 전화가 왔어요.</Text>
           </View>
-          <Text style={styles.crimeCardText}>실제 지인의 번호로 사칭 전화가 왔어요.</Text>
-        </View>
+        </ImageBackground>
 
         {/* Hot Posts Section */}
          <View style={styles.sectionHeader}>
@@ -218,7 +222,7 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 16,
     overflow: 'hidden',
-     shadowColor: Colors.primary,
+    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -299,27 +303,29 @@ const styles = StyleSheet.create({
   },
   crimeCard: {
     marginHorizontal: 20,
-    backgroundColor: Colors.white,
+    height: 150, // Fixed height for the banner
+    marginBottom: 30,
     borderRadius: 16,
     overflow: 'hidden',
-    marginBottom: 30,
+    justifyContent: 'flex-end',
+    // Shadow
      shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
   },
-  crimeImagePlaceholder: {
-    height: 150,
-    backgroundColor: '#8E8E93', // Placeholder color
-    justifyContent: 'center',
-    alignItems: 'center',
+  crimeCardOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.3)', // Dark overlay
+      justifyContent: 'flex-end',
   },
   crimeCardText: {
     padding: 16,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#111',
+    color: '#FFFFFF', // White text
+    lineHeight: 26,
   },
   hotPostsContainer: {
     marginHorizontal: 20,

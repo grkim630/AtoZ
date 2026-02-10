@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Dimensions, FlatList, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, FlatList, ImageBackground, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /* 
@@ -26,9 +26,7 @@ const SCENARIOS = [
         time: '1분 전',
         rating: 4.5,
         type: 'police',
-        // Placeholder images (using solid colors for now if images fail, but structure supports ImageBackground)
-        // In a real app, these would be require('./assets/...') or URLs
-        bgColor: '#1A2A44', 
+        image: require('../../assets/images/Rectangle 271.png'),
     },
     {
         id: '2',
@@ -38,7 +36,7 @@ const SCENARIOS = [
         time: '3분 전',
         rating: 4.3,
         type: 'court',
-        bgColor: '#2C3E50',
+        image: require('../../assets/images/Rectangle 272.png'), // Mapped to available image
     },
     {
         id: '3',
@@ -48,7 +46,7 @@ const SCENARIOS = [
         time: '7분 전',
         rating: 4.8,
         type: 'delivery',
-        bgColor: '#34495E',
+        image: require('../../assets/images/Rectangle 273.png'), // Mapped to available image
     },
     {
         id: '4',
@@ -58,19 +56,39 @@ const SCENARIOS = [
         time: '12분 전',
         rating: 4.9,
         type: 'family',
-        bgColor: '#3E2723',
+        image: require('../../assets/images/Rectangle 274.png'), // Mapped to available image
+    },
+    {
+        id: '5',
+        title: '해외 송금 사기',
+        desc: '해외로 수수료를 송금해야\n한다는 전화가 왔어요',
+        reportCount: '41만',
+        time: '30분 전',
+        rating: 4.8,
+        type: 'remittance',
+        image: require('../../assets/images/Rectangle 275.png'), // Mapped to available image
+    },
+    {
+        id: '6',
+        title: '지인 사칭 전화',
+        desc: '실제 지인의 이름으로\n전화가 왔어요',
+        reportCount: '32만',
+        time: '10분 전',
+        rating: 4.9,
+        type: 'acquaintance',
+        image: require('../../assets/images/Rectangle 276.png'), // Mapped to available image
     },
 ];
 
 const ScenarioCard = ({ item, onPress }: { item: typeof SCENARIOS[0], onPress: () => void }) => {
     return (
         <Pressable onPress={onPress} style={styles.cardWrapper}>
-             {/* 
-                Using View with backgroundColor as fallback for ImageBackground 
-                since actual image assets were not successfully generated.
-                Structure is prepared for ImageBackground.
-             */}
-            <View style={[styles.card, { backgroundColor: item.bgColor }]}>
+            <ImageBackground
+                source={item.image}
+                style={styles.card}
+                imageStyle={{ borderRadius: 16 }}
+                resizeMode="cover"
+            >
                 <View style={styles.cardOverlay} />
                 
                 <TouchableOpacity style={styles.bookmark}>
@@ -81,7 +99,7 @@ const ScenarioCard = ({ item, onPress }: { item: typeof SCENARIOS[0], onPress: (
                     <Text style={styles.cardTitle}>{item.title}</Text>
                     <Text style={styles.cardDesc}>{item.desc}</Text>
                 </View>
-            </View>
+            </ImageBackground>
             
             <View style={styles.cardFooter}>
                  <Text style={styles.statsText}>신고 {item.reportCount} 회 · {item.time}</Text>
@@ -223,16 +241,16 @@ const styles = StyleSheet.create({
       marginBottom: 24,
   },
   card: {
-      height: 220, // Vertical aspect ratio
+      height: undefined, // Let aspect ratio handle it
+      aspectRatio: 3/4, // Vertical formatting (Portrait)
       borderRadius: 16,
       overflow: 'hidden',
-      position: 'relative',
       justifyContent: 'flex-end', // Text at bottom
-      padding: 16,
+      padding: 20, // Increased padding
   },
   cardOverlay: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(0,0,0,0.3)', // Darken image
+      backgroundColor: 'rgba(0,0,0,0.35)', // Slightly darker overlay
   },
   bookmark: {
       position: 'absolute',
@@ -245,15 +263,21 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
       color: 'white',
-      fontSize: 16, // Reduced slightly to fit
+      fontSize: 16, 
       fontWeight: 'bold',
-      marginBottom: 6,
+      marginBottom: 8,
       lineHeight: 22,
+      textShadowColor: 'rgba(0, 0, 0, 0.75)',
+      textShadowOffset: {width: 0, height: 1},
+      textShadowRadius: 3,
   },
   cardDesc: {
-      color: '#EEE',
+      color: '#F0F0F0',
       fontSize: 11,
-      lineHeight: 15,
+      lineHeight: 16,
+      textShadowColor: 'rgba(0, 0, 0, 0.75)',
+      textShadowOffset: {width: 0, height: 1},
+      textShadowRadius: 3,
   },
   cardFooter: {
       flexDirection: 'row',

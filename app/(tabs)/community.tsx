@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import {
     Dimensions,
     FlatList,
+    Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -36,11 +37,19 @@ const FeedItem = ({ item }: { item: any }) => (
     <Text style={styles.feedContent} numberOfLines={2}>{item.content}</Text>
 
     {/* Placeholder content area mimicking the screenshot */}
-    <View style={styles.contentPlaceholder}>
-        <Text style={styles.placeholderText}>
-            {item.type === 'Voice' ? '통화 내용 스크립트...' : '문자 메시지 내용...'}
-        </Text>
-    </View>
+    {item.image ? (
+        <Image 
+            source={item.image}
+            style={styles.feedImage}
+            resizeMode="cover"
+        />
+    ) : (
+        <View style={styles.contentPlaceholder}>
+            <Text style={styles.placeholderText}>
+                {item.type === 'Voice' ? '통화 내용 스크립트...' : '문자 메시지 내용...'}
+            </Text>
+        </View>
+    )}
 
     <View style={styles.feedFooter}>
       <View style={styles.interaction}>
@@ -238,6 +247,14 @@ const styles = StyleSheet.create({
   placeholderText: {
       color: Colors.gray,
       fontSize: 12,
+  },
+  feedImage: {
+      width: '100%',
+      height: 200, // Fixed height for consistency
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: '#EEEEEE',
+      marginBottom: 12,
   },
   feedFooter: {
     flexDirection: 'row',

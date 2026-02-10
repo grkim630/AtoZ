@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useRouter } from 'expo-router';
 import React from 'react';
-import { Dimensions, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Dimensions, ImageBackground, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
@@ -37,12 +37,11 @@ export default function GalleryScreen() {
 
         {/* Large Cards */}
         <Pressable onPress={() => router.push('/gallery/phone_list')} style={styles.cardContainer}>
-             <LinearGradient
-                // Simulating the dark phone image background with a gradient
-                colors={['#4c669f', '#3b5998', '#192f6a']}
+             <ImageBackground
+                source={require('../../assets/images/Rectangle 12.png')}
                 style={styles.cardInfo}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
+                imageStyle={{ borderRadius: 20 }}
+                resizeMode="cover"
              >
                 <View style={styles.overlay}>
                     <Text style={styles.cardText}>전화</Text>
@@ -50,23 +49,22 @@ export default function GalleryScreen() {
                     <Ionicons name="call" size={40} color="rgba(255,255,255,0.3)" style={{ position: 'absolute', top: 20, left: 30 }} />
                     <Ionicons name="mic" size={30} color="rgba(255,255,255,0.2)" style={{ position: 'absolute', bottom: 30, right: 40 }} />
                 </View>
-             </LinearGradient>
+             </ImageBackground>
         </Pressable>
 
         <Pressable onPress={() => router.push('/gallery/message_list')} style={styles.cardContainer}>
-            <LinearGradient
-                // Simulating the dark message image background
-                colors={['#485563', '#29323c']} 
+            <ImageBackground
+                source={require('../../assets/images/Rectangle 14.png')}
                 style={styles.cardInfo}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
+                imageStyle={{ borderRadius: 20 }}
+                resizeMode="cover"
             >
                 <View style={styles.overlay}>
                     <Text style={styles.cardText}>메세지</Text>
                      {/* Decorative Icons to mimic the message UI */}
                     <Ionicons name="chatbubble-ellipses" size={40} color="rgba(255,255,255,0.3)" style={{ position: 'absolute', top: 30, right: 30 }} />
                 </View>
-            </LinearGradient>
+            </ImageBackground>
         </Pressable>
 
         <View style={styles.divider} />
