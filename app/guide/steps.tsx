@@ -4,408 +4,148 @@ import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-/*
-  Crime Response Steps Flowchart Screen
-  Visual Fix: STRICT HARDCODED VALUES
-  - Root BG: #E5ECFF
-  - Card BG: #FFFFFF
-  - Box BG: #F4F8FF
-  - Button: Transparent, Text #0055FF
-  - Padding: 24 (H) / 32 (V)
-  - Margin: 20
-  - Radius: 16
-*/
+// [STRICT DESIGN CONSTANTS]
+const COLORS = {
+  ROOT_BG: '#E5ECFF',      //
+  CARD_BG: '#FFFFFF',
+  BOX_BG: '#F4F8FF',       //
+  PRIMARY_BLUE: '#0055FF', //
+  TEXT_MAIN: '#111111',
+  TEXT_SUB: '#444444',
+};
 
-const StepBox = ({ text, style, onPress, isBlue = false }: { text: string, style?: any, onPress?: () => void, isBlue?: boolean }) => (
-    <TouchableOpacity 
-        style={[styles.stepBox, style, isBlue && styles.blueBox]} 
-        activeOpacity={0.7}
-        onPress={onPress}
-    >
-        <Text style={[styles.stepText, isBlue && styles.blueBoxText]}>{text}</Text>
-    </TouchableOpacity>
+const LINE_WIDTH = 1.5; // 선 두께 통일
+
+const StepBox = ({ text, style, isBlueText = false }: { text: string; style?: any; isBlueText?: boolean }) => (
+  <TouchableOpacity style={[styles.stepBox, style]} activeOpacity={0.8}>
+    <Text style={[styles.stepText, isBlueText && styles.blueText]}>{text}</Text>
+  </TouchableOpacity>
 );
 
-export default function GuideStepsScreen() {
-    const router = useRouter();
-
+// 선 겹침 방지를 위해 단일 View 구조로 재설계된 커넥터
+const Connector = ({ type }: { type: 'merge' | 'split' | 'subSplit' | 'subMerge' | 'straight' }) => {
+  if (type === 'merge') {
     return (
-        <SafeAreaView style={styles.container}>
-            <Stack.Screen options={{ headerShown: false }} />
-
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="chevron-back" size={24} color="#111" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>범행 단계별 대응안</Text>
-                <Ionicons name="search-outline" size={24} color="#111" />
-            </View>
-
-            <View style={styles.subHeader}>
-                <Ionicons name="chatbubble" size={20} color="#0055FF" />
-                <Text style={styles.subHeaderText}>궁금한 절차를 선택해주세요.</Text>
-            </View>
-
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                {/* Main White Card Container */}
-                <View style={styles.mainCard}>
-                    
-                    <View style={styles.flowchartContainer}>
-                        
-                        {/* Level 1: Transaction / Damage */}
-                        <View style={styles.levelRow}>
-                            <StepBox text={`거래를 하려는\n경우`} style={styles.halfBox} />
-                            <StepBox text={`피해를 당한\n경우`} style={styles.halfBox} />
-                        </View>
-
-                        {/* Connector 1 -> 2 (Merge) */}
-                        <View style={styles.connectorContainer}>
-                             <View style={styles.bracketLeftMerge} />
-                             <View style={styles.bracketRightMerge} />
-                             <View style={styles.bracketStemDown} />
-                        </View>
-
-                        {/* Level 2: Reported */}
-                        <View style={styles.levelRow}>
-                            <StepBox text={`신고를 완료한\n경우`} style={styles.centerBox} isBlue={true} />
-                        </View>
-
-                        {/* Connector 2 -> 3 (Split) */}
-                        <View style={styles.connectorContainer}>
-                             <View style={styles.bracketStemUp} />
-                             <View style={styles.bracketLeftSplit} />
-                             <View style={styles.bracketRightSplit} />
-                        </View>
-
-                        {/* Level 3: Suspect Caught / Suspended */}
-                        <View style={styles.levelRow}>
-                            <StepBox text={`용의자가 검거된\n경우`} style={styles.halfBox} />
-                            <StepBox text={`기소가 중지된\n경우`} style={styles.halfBox} />
-                        </View>
-
-                        {/* Level 3 -> 4: Left Split */}
-                        <View style={styles.connectorContainer}>
-                            <View style={[styles.bracketStemUp, { left: '23%' }]} />
-                             <View style={styles.bracketLeftSubSplit} />
-                             <View style={styles.bracketRightSubSplit} />
-                        </View>
-
-                        {/* Level 4: Agreement Details */}
-                        <View style={styles.levelRow}>
-                            <StepBox text={`(용의자가) 합의를\n원하는 경우`} style={styles.halfBox} />
-                            <StepBox text={`(용의자가) 합의를\n원하지 않는 경우`} style={styles.halfBox} />
-                        </View>
-
-                        {/* Connector 4 -> 5 (Merge) */}
-                        <View style={styles.connectorContainer}>
-                             <View style={styles.bracketLeftMerge} />
-                             <View style={styles.bracketRightMerge} />
-                             <View style={styles.bracketStemDown} />
-                        </View>
-
-                        {/* Level 5: Trial */}
-                        <View style={styles.levelRow}>
-                            <StepBox text="재판" style={styles.fullBox} isBlue={true} />
-                        </View>
-
-                         {/* Connector 5 -> 6 (Split) */}
-                        <View style={styles.connectorContainer}>
-                             <View style={styles.bracketStemUp} />
-                             <View style={styles.bracketLeftSplit} />
-                             <View style={styles.bracketRightSplit} />
-                        </View>
-
-                        {/* Level 6: Restitution Application */}
-                        <View style={styles.levelRow}>
-                            <StepBox text={`배상명령 신청을 한\n경우`} style={styles.halfBox} />
-                            <StepBox text={`배상명령 신청을 못한\n경우`} style={styles.halfBox} />
-                        </View>
-
-                        {/* Connector 6 -> 7 */}
-                        <View style={styles.connectorContainer}>
-                            <View style={[styles.vLineFull, { left: '23%' }]} />
-                            <View style={[styles.vLineFull, { right: '23%' }]} />
-                        </View>
-
-                        {/* Level 7: Enforcement / Civil Litigation */}
-                        <View style={styles.levelRow}>
-                             <StepBox text="강제집행" style={styles.halfBox} />
-                             <View style={styles.arrowContainer}>
-                                <Ionicons name="arrow-forward" size={18} color="#0055FF" />
-                             </View>
-                             <StepBox text="민사소송" style={styles.halfBox} />
-                        </View>
-
-                    </View>
-                </View>
-                
-                {/* Spacer for bottom area */}
-                <View style={{ height: 60 }} />
-            </ScrollView>
-
-            {/* Bottom Button (Transparent Text Link) */}
-            <View style={styles.bottomContainer}>
-                <TouchableOpacity style={styles.chatButton}>
-                    <Text style={styles.chatButtonText}>채팅 상담</Text>
-                    <Ionicons name="chevron-forward" size={20} color="#0055FF" style={{ marginLeft: 4 }} />
-                </TouchableOpacity>
-            </View>
-        </SafeAreaView>
+      <View style={styles.connectorHeight}>
+        <View style={styles.lineLeftMerge} />
+        <View style={styles.lineRightMerge} />
+        <View style={styles.lineStemDown} />
+      </View>
     );
+  }
+  if (type === 'split') {
+    return (
+      <View style={styles.connectorHeight}>
+        <View style={styles.lineStemUp} />
+        <View style={styles.lineLeftSplit} />
+        <View style={styles.lineRightSplit} />
+      </View>
+    );
+  }
+  return <View style={styles.connectorHeight}><View style={styles.vLine} /></View>;
+};
+
+export default function GuideStepsScreen() {
+  const router = useRouter();
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={24} color={COLORS.TEXT_MAIN} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>범행 단계별 대응안</Text>
+        <Ionicons name="search-outline" size={24} color={COLORS.TEXT_MAIN} />
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.subHeader}>
+          <Ionicons name="chatbubble" size={20} color={COLORS.PRIMARY_BLUE} />
+          <Text style={styles.subHeaderText}>궁금한 절차를 선택해주세요.</Text>
+        </View>
+
+        <View style={styles.mainCard}>
+          <View style={styles.flowchart}>
+            <View style={styles.row}><StepBox text={`거래를 하려는\n경우`} style={styles.halfBox} /><StepBox text={`피해를 당한\n경우`} style={styles.halfBox} /></View>
+            <Connector type="merge" />
+            <View style={styles.row}><StepBox text={`신고를 완료한\n경우`} style={styles.centerBox} isBlueText={true} /></View>
+            <Connector type="split" />
+            <View style={styles.row}><StepBox text={`용의자가 검거된\n경우`} style={styles.halfBox} /><StepBox text={`기소가 중지된\n경우`} style={styles.halfBox} /></View>
+            
+            {/* 용의자 검거 -> 합의 분기선 보정 */}
+            <View style={styles.connectorHeight}>
+                <View style={[styles.lineStemUp, { left: '24%' }]} />
+                <View style={[styles.lineLeftSplit, { left: '24%', width: '26%', borderTopLeftRadius: 0 }]} />
+                <View style={[styles.lineRightSplit, { left: '50%', right: '24%' }]} />
+            </View>
+
+            <View style={styles.row}><StepBox text={`(용의자가) 합의를\n원하는 경우`} style={styles.halfBox} /><StepBox text={`(용의자가) 합의를\n원하지 않는 경우`} style={styles.halfBox} /></View>
+            
+            {/* 합의 -> 재판 병합선 보정 */}
+            <View style={styles.connectorHeight}>
+                 <View style={[styles.lineLeftMerge, { left: '24%', width: '26%', borderBottomLeftRadius: 0 }]} />
+                 <View style={[styles.lineRightMerge, { left: '50%', right: '24%' }]} />
+                 <View style={[styles.lineStemDown, { left: '24%' }]} />
+            </View>
+
+            <View style={styles.row}><StepBox text="재판" style={styles.fullBox} isBlueText={true} /></View>
+            <Connector type="split" />
+            <View style={styles.row}><StepBox text={`배상명령 신청을 한\n경우`} style={styles.halfBox} /><StepBox text={`배상명령 신청을 못한\n경우`} style={styles.halfBox} /></View>
+            <View style={styles.connectorHeight}><View style={[styles.vLine, { left: '24%' }]} /><View style={[styles.vLine, { right: '24%' }]} /></View>
+            <View style={styles.row}>
+              <StepBox text="강제집행" style={styles.halfBox} />
+              <View style={styles.arrowIcon}><Ionicons name="arrow-forward" size={20} color={COLORS.PRIMARY_BLUE} /></View>
+              <StepBox text="민사소송" style={styles.halfBox} />
+            </View>
+          </View>
+        </View>
+        <View style={{ height: 100 }} />
+      </ScrollView>
+
+      <View style={styles.bottomNav}>
+        <TouchableOpacity style={styles.linkButton}>
+          <Text style={styles.linkButtonText}>채팅 상담</Text>
+          <Ionicons name="chevron-forward" size={20} color={COLORS.PRIMARY_BLUE} />
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
 }
 
-// Global Constants for this file
-const LINE_Color = '#0055FF'; 
-const LINE_WIDTH = 1.5;
-const RADIUS = 16; 
-
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#E5ECFF', // [Fixed] Root Background
-    },
-    header: {
-        height: 56,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        backgroundColor: '#E5ECFF', // Match Root BG
-    },
-    backButton: {
-        padding: 4,
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#111',
-    },
-    subHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        marginTop: 10,
-        marginBottom: 20, 
-    },
-    subHeaderText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#111',
-        marginLeft: 8,
-    },
-    scrollContent: {
-        paddingHorizontal: 16, 
-        paddingBottom: 40,
-    },
-    // The "White Card"
-    mainCard: {
-        backgroundColor: '#FFFFFF', // [Fixed] Pure White
-        borderRadius: 24, 
-        paddingVertical: 32,    // [Fixed] 32
-        paddingHorizontal: 24,  // [Fixed] 24
-        width: '100%',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 3,
-    },
-    flowchartContainer: {
-        alignItems: 'center',
-    },
-    levelRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        width: '100%',
-        alignItems: 'center',
-        minHeight: 50,
-        marginBottom: 20, // [Fixed] Margin 20+
-    },
-    stepBox: {
-        backgroundColor: '#F4F8FF', // [Fixed] Light Sky Blue Box
-        borderRadius: 16,           // [Fixed] Radius 16
-        paddingVertical: 18,
-        paddingHorizontal: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: 70,
-    },
-    blueBox: {
-        backgroundColor: '#F4F8FF', // Keep same or slightly different if needed, but user said #F4F8FF
-        borderWidth: 1,
-        borderColor: '#0055FF', // Highlight border for "blue" items? Or just text color? 
-        // User said "Box background... #F4F8FF". I will keep it consistent.
-        // Let's add the border only if it was intended to be "Active".
-        // For now, I'll keep the background consistent and use text color to differentiate.
-    },
-    blueBoxText: {
-        color: '#0055FF',
-        fontWeight: '700',
-    },
-    halfBox: {
-        width: '47%', 
-    },
-    centerBox: {
-        width: '60%', 
-        alignSelf: 'center',
-    },
-    fullBox: {
-        width: '100%',
-    },
-    stepText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#333',
-        textAlign: 'center',
-        lineHeight: 20,
-    },
+  container: { flex: 1, backgroundColor: COLORS.ROOT_BG },
+  header: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20 },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.TEXT_MAIN },
+  backButton: { padding: 4 },
+  subHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, paddingHorizontal: 4, marginTop: 10 },
+  subHeaderText: { fontSize: 16, fontWeight: 'bold', color: COLORS.TEXT_MAIN, marginLeft: 8 },
+  scrollContent: { paddingHorizontal: 16 },
+  mainCard: { backgroundColor: COLORS.CARD_BG, borderRadius: 24, paddingHorizontal: 24, paddingVertical: 32, elevation: 3, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10 },
+  flowchart: { alignItems: 'center' },
+  row: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center' },
+  stepBox: { backgroundColor: COLORS.BOX_BG, borderRadius: 16, paddingVertical: 18, paddingHorizontal: 12, justifyContent: 'center', alignItems: 'center', minHeight: 74 },
+  halfBox: { width: '48%' },
+  centerBox: { width: '64%', alignSelf: 'center' },
+  fullBox: { width: '100%' },
+  stepText: { fontSize: 15, fontWeight: '600', color: COLORS.TEXT_SUB, textAlign: 'center', lineHeight: 22 },
+  blueText: { color: COLORS.PRIMARY_BLUE, fontWeight: 'bold' },
 
-    // Connector Architecture
-    connectorContainer: {
-        // The connectors need to span the gap between rows.
-        // Previous logic relied on absolute positioning.
-        // If we have marginBottom on levelRow, the connectors need to overlap or bridge that gap.
-        // Actually, the connectors should probably NOT have height if they are just lines?
-        // No, they need height to draw the curves.
-        height: 48, 
-        marginTop: -20, // Pull up to bridge the gap if levelRow has margin
-        marginBottom: 0, 
-        width: '100%',
-        position: 'relative',
-        zIndex: -1, // Send to back?
-    },
-    
-    // MERGE SHAPES
-    bracketLeftMerge: {
-        position: 'absolute',
-        top: 0,
-        left: '23.5%', 
-        right: '50%', 
-        height: '100%',
-        borderLeftWidth: LINE_WIDTH,
-        borderBottomWidth: LINE_WIDTH,
-        borderBottomLeftRadius: RADIUS,
-        borderColor: LINE_Color,
-    },
-    bracketRightMerge: {
-        position: 'absolute',
-        top: 0,
-        left: '50%', 
-        right: '23.5%', 
-        height: '100%',
-        borderRightWidth: LINE_WIDTH,
-        borderBottomWidth: LINE_WIDTH,
-        borderBottomRightRadius: RADIUS,
-        borderColor: LINE_Color,
-    },
-    bracketStemDown: {
-        position: 'absolute',
-        top: '50%', 
-        left: '50%',
-        height: '50%',
-        width: LINE_WIDTH,
-        backgroundColor: LINE_Color,
-        marginLeft: -LINE_WIDTH / 2,
-    },
-    
-    // SPLIT SHAPES
-    bracketStemUp: {
-        position: 'absolute',
-        top: 0,
-        left: '50%',
-        height: '50%',
-        width: LINE_WIDTH,
-        backgroundColor: LINE_Color,
-        marginLeft: -LINE_WIDTH / 2,
-    },
-    bracketLeftSplit: {
-        position: 'absolute',
-        top: '50%',
-        left: '23.5%', 
-        right: '50%', 
-        height: '50%',
-        borderTopWidth: LINE_WIDTH,
-        borderLeftWidth: LINE_WIDTH,
-        borderTopLeftRadius: RADIUS,
-        borderColor: LINE_Color,
-    },
-    bracketRightSplit: {
-        position: 'absolute',
-        top: '50%',
-        left: '50%', 
-        right: '23.5%', 
-        height: '50%',
-        borderTopWidth: LINE_WIDTH,
-        borderRightWidth: LINE_WIDTH,
-        borderTopRightRadius: RADIUS,
-        borderColor: LINE_Color,
-    },
-    
-    // SUB-SPLIT (Level 3 -> 4)
-    bracketLeftSubSplit: {
-        position: 'absolute',
-        top: '50%',
-        left: '23.5%', 
-        width: LINE_WIDTH,
-        height: '50%',
-        backgroundColor: LINE_Color,
-        marginLeft: -LINE_WIDTH / 2,
-     },
-     bracketRightSubSplit: {
-         position: 'absolute',
-         top: '50%',
-         left: '23.5%',
-         right: '23.5%',
-         height: '50%',
-         borderTopWidth: LINE_WIDTH,
-         borderRightWidth: LINE_WIDTH,
-         borderTopRightRadius: RADIUS,
-         borderColor: LINE_Color,
-     },
-
-    // Straight Lines
-    vLineFull: {
-        position: 'absolute',
-        top: 0,
-        bottom: 0,
-        width: LINE_WIDTH,
-        backgroundColor: LINE_Color,
-        marginLeft: -LINE_WIDTH / 2, 
-    },
-    
-    // Arrow
-    arrowContainer: {
-        position: 'absolute',
-        left: '50%',
-        marginLeft: -9,
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 10,
-    },
-
-    // Bottom Buttons
-    bottomContainer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        paddingVertical: 20,
-        alignItems: 'center',
-        backgroundColor: 'transparent',
-    },
-    chatButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 20,
-        backgroundColor: 'transparent', // [Fixed] Transparent
-    },
-    chatButtonText: {
-        color: '#0055FF', // [Fixed] Blue Text
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginRight: 4,
-    },
+  // [겹침 해결 핵심 스타일]
+  connectorHeight: { height: 40, width: '100%', position: 'relative', marginVertical: -2 },
+  
+  // 가로선과 세로선이 만나는 지점을 zIndex와 정밀 좌표로 조정
+  lineLeftMerge: { position: 'absolute', top: 0, left: '24%', right: '50%', height: 20, borderLeftWidth: LINE_WIDTH, borderBottomWidth: LINE_WIDTH, borderBottomLeftRadius: 12, borderColor: COLORS.PRIMARY_BLUE },
+  lineRightMerge: { position: 'absolute', top: 0, right: '24%', left: '50%', height: 20, borderRightWidth: LINE_WIDTH, borderBottomWidth: LINE_WIDTH, borderBottomRightRadius: 12, borderColor: COLORS.PRIMARY_BLUE },
+  lineStemDown: { position: 'absolute', top: 20, left: '50%', width: LINE_WIDTH, height: 20, backgroundColor: COLORS.PRIMARY_BLUE, marginLeft: -LINE_WIDTH / 2 },
+  lineStemUp: { position: 'absolute', top: 0, left: '50%', width: LINE_WIDTH, height: 20, backgroundColor: COLORS.PRIMARY_BLUE, marginLeft: -LINE_WIDTH / 2 },
+  lineLeftSplit: { position: 'absolute', top: 20, left: '24%', right: '50%', height: 20, borderLeftWidth: LINE_WIDTH, borderTopWidth: LINE_WIDTH, borderTopLeftRadius: 12, borderColor: COLORS.PRIMARY_BLUE },
+  lineRightSplit: { position: 'absolute', top: 20, right: '24%', left: '50%', height: 20, borderRightWidth: LINE_WIDTH, borderTopWidth: LINE_WIDTH, borderTopRightRadius: 12, borderColor: COLORS.PRIMARY_BLUE },
+  
+  vLine: { position: 'absolute', top: 0, bottom: 0, width: LINE_WIDTH, backgroundColor: COLORS.PRIMARY_BLUE, marginLeft: -LINE_WIDTH / 2 },
+  arrowIcon: { position: 'absolute', left: '50%', marginLeft: -10 },
+  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingBottom: 34, paddingTop: 20, backgroundColor: 'rgba(255,255,255,0.85)', alignItems: 'center' },
+  linkButton: { flexDirection: 'row', alignItems: 'center', padding: 10 },
+  linkButtonText: { color: COLORS.PRIMARY_BLUE, fontSize: 18, fontWeight: 'bold' },
 });

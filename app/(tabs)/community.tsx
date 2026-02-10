@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient'; // For card overlay
 import React, { useState } from 'react';
 import {
     Dimensions,
-    FlatList,
     Image,
     ScrollView,
     StyleSheet,
@@ -17,104 +17,124 @@ import { MOCK_FEED } from '@/src/services/mockData';
 
 const { width } = Dimensions.get('window');
 
-const FILTERS = ['추천순', '보이스피싱', '로맨스스캠', '영상피싱'];
+// 1. Types for Mock Data
+// Reusing MOCK_FEED from service, identifying Best Picks from it or creating static ones
+const BEST_PICKS = [
+    { id: 'b1', title: '다급한 목소리에 속지 마세요', desc: '지인 사칭 보이스피싱 예방 가이드', image: require('../../assets/images/Rectangle 12.png') }, // Assuming this asset exists from previous steps
+    { id: 'b2', title: '모르는 링크는 절대 클릭 금지', desc: '스미싱 문자 구별법', image: require('../../assets/images/Rectangle 12.png') },
+    { id: 'b3', title: '경찰청 사칭 전화 주의보', desc: '최근 유행하는 수법 총정리', image: require('../../assets/images/Rectangle 12.png') },
+];
 
-const FeedItem = ({ item }: { item: any }) => (
-  <View style={styles.feedCard}>
-    <View style={styles.feedHeader}>
-      <View style={[styles.badge, styles.badgeBlue]}>
-        <Text style={styles.badgeText}>{item.type === 'Voice' ? '보이스피싱' : '로맨스스캠'}</Text>
-      </View>
-      {item.status === 'Analyzed' && (
-        <View style={[styles.badge, styles.badgeGray]}>
-          <Text style={styles.badgeText}>분석 완료</Text>
-        </View>
-      )}
-      <Text style={styles.timeText}>{item.time} · 조회 {item.views}</Text>
+const CATEGORIES = ['전체', '피싱 예방', '피싱 대응'];
+
+// 2. Component: Horizontal Best Pick Card
+const BestPickCard = ({ item }: { item: any }) => (
+    <View style={styles.bestPickCard}>
+        <Image source={item.image} style={styles.bestPickImage} resizeMode="cover" />
+        <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.8)']}
+            style={styles.cardOverlay}
+        >
+            <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+            <Text style={styles.cardDesc} numberOfLines={1}>{item.desc}</Text>
+        </LinearGradient>
     </View>
-
-    <Text style={styles.feedTitle}>{item.title}</Text>
-    <Text style={styles.feedContent} numberOfLines={2}>{item.content}</Text>
-
-    {/* Placeholder content area mimicking the screenshot */}
-    {item.image ? (
-        <Image 
-            source={item.image}
-            style={styles.feedImage}
-            resizeMode="cover"
-        />
-    ) : (
-        <View style={styles.contentPlaceholder}>
-            <Text style={styles.placeholderText}>
-                {item.type === 'Voice' ? '통화 내용 스크립트...' : '문자 메시지 내용...'}
-            </Text>
-        </View>
-    )}
-
-    <View style={styles.feedFooter}>
-      <View style={styles.interaction}>
-        <Ionicons name="thumbs-up-outline" size={16} color={Colors.gray} />
-        <Text style={styles.interactionText}>{item.likes}</Text>
-      </View>
-      <View style={styles.interaction}>
-        <Ionicons name="chatbubble-outline" size={16} color={Colors.gray} />
-        <Text style={styles.interactionText}>{item.comments}</Text>
-      </View>
-    </View>
-  </View>
 );
 
-export default function CommunityScreen() {
-  const [activeFilter, setActiveFilter] = useState('추천순');
+// 3. Component: Vertical List Item
+const ReviewListItem = ({ item }: { item: any }) => (
+    <View style={styles.listItem}>
+        {/* Left: Thumbnail */}
+        <Image 
+            source={item.image ? item.image : require('../../assets/images/Rectangle 12.png')} // Fallback or item.image
+            style={styles.listThumbnail}
+            resizeMode="cover"
+        />
+        
+        {/* Right: Text Info */}
+        <View style={styles.listContentContainer}>
+            <View style={styles.listHeaderRow}>
+                <View style={[styles.tagBadge, item.type === 'Voice' ? styles.tagBlue : styles.tagRed]}>
+                    <Text style={[styles.tagText, item.type === 'Voice' ? styles.tagTextBlue : styles.tagTextRed]}>
+                        {item.type === 'Voice' ? '피싱 예방' : '피싱 대응'}
+                    </Text>
+                </View>
+                <Text style={styles.dateText}>{item.time}</Text>
+            </View>
+            
+            <Text style={styles.listTitle} numberOfLines={1}>{item.title}</Text>
+            <Text style={styles.listDesc} numberOfLines={2}>{item.content}</Text>
+            
+            <View style={styles.listFooter}>
+                <View style={styles.iconRow}>
+                    <Ionicons name="heart" size={14} color="#FF4B4B" />
+                    <Text style={styles.iconText}>{item.likes}</Text>
+                </View>
+                <View style={styles.iconRow}>
+                    <Ionicons name="chatbubble-outline" size={14} color="#666" />
+                    <Text style={styles.iconText}>{item.comments}</Text>
+                </View>
+            </View>
+        </View>
+    </View>
+);
+
+export default function ReviewScreen() { // Renamed component to ReviewScreen logically, usually stays CommunityScreen in export if file name is community.tsx but Content matches "Review"
+  const [activeCategory, setActiveCategory] = useState('전체');
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>피드</Text>
-        <View style={styles.headerIcons}>
-           <Ionicons name="search-outline" size={24} color={Colors.text} style={{marginRight: 15}}/>
-           <Ionicons name="notifications-outline" size={24} color={Colors.text} />
+        <Text style={styles.headerTitle}>콘텐츠 리뷰</Text>
+        <TouchableOpacity>
+            <Ionicons name="search-outline" size={24} color="#111" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        
+        {/* Section 1: Best Picks */}
+        <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>가장 많은 추천을 받았어요! 🔥</Text>
+            <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalScroll}
+            >
+                {BEST_PICKS.map((pick) => (
+                    <BestPickCard key={pick.id} item={pick} />
+                ))}
+            </ScrollView>
         </View>
-      </View>
 
-      <View style={styles.tabContainer}>
-        <Text style={[styles.tabTitle, styles.activeTab]}>최신 피드</Text>
-        <Text style={styles.tabTitle}>핫한 게시글</Text>
-      </View>
-
-      <View style={styles.filterContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-            {FILTERS.map((filter) => (
-            <TouchableOpacity
-                key={filter}
-                style={[
-                styles.filterChip,
-                activeFilter === filter && styles.activeFilterChip,
-                ]}
-                onPress={() => setActiveFilter(filter)}>
-                <Text
-                style={[
-                    styles.filterText,
-                    activeFilter === filter && styles.activeFilterText,
-                ]}>
-                {filter}
-                </Text>
-            </TouchableOpacity>
+        {/* Section 2: Category Filter */}
+        <View style={styles.filterContainer}>
+            {CATEGORIES.map((cat) => (
+                <TouchableOpacity 
+                    key={cat} 
+                    style={[styles.filterChip, activeCategory === cat && styles.activeChip]}
+                    onPress={() => setActiveCategory(cat)}
+                >
+                    <Text style={[styles.filterText, activeCategory === cat && styles.activeFilterText]}>
+                        {cat}
+                    </Text>
+                </TouchableOpacity>
             ))}
-        </ScrollView>
-      </View>
-       
-       <View style={styles.feedCountContainer}>
-           <Text style={styles.feedCountText}>전체 게시글 382,443</Text>
-       </View>
+        </View>
 
-      <FlatList
-        data={MOCK_FEED}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <FeedItem item={item} />}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+        {/* Section 3: Vertical List */}
+        <View style={styles.listContainer}>
+            {MOCK_FEED.map((item) => (
+                <ReviewListItem key={item.id} item={item} />
+            ))}
+        </View>
+
+        {/* Bottom Padding */}
+        <View style={{ height: 80 }} /> 
+
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -122,151 +142,175 @@ export default function CommunityScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: '#F8F9FA', // [Fixed] Background Color
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingVertical: 16,
+    backgroundColor: '#F8F9FA',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: Colors.text,
+    color: '#111',
   },
-  headerIcons: {
-      flexDirection: 'row',
+  scrollContent: {
+    paddingBottom: 20,
   },
-  tabContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 15,
+  
+  // Best Picks Styles
+  sectionContainer: {
+    marginTop: 10,
+    marginBottom: 24,
   },
-  tabTitle: {
+  sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: Colors.gray,
-    marginRight: 20,
+    color: '#111',
+    marginLeft: 20,
+    marginBottom: 16,
   },
-  activeTab: {
-    color: Colors.text,
+  horizontalScroll: {
+    paddingHorizontal: 20,
+    paddingRight: 10, // Extra padding for last item
   },
+  bestPickCard: {
+    width: 280,
+    height: 160,
+    borderRadius: 16,
+    marginRight: 16,
+    overflow: 'hidden',
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    position: 'relative',
+  },
+  bestPickImage: {
+    width: '100%',
+    height: '100%',
+  },
+  cardOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    padding: 16,
+    justifyContent: 'flex-end',
+  },
+  cardTitle: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  cardDesc: {
+    color: '#DDD',
+    fontSize: 13,
+  },
+
+  // Filter Styles
   filterContainer: {
-    marginBottom: 15,
-  },
-  filterScroll: {
-      paddingHorizontal: 20,
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginBottom: 24,
   },
   filterChip: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#F2F4F6', // Light gray
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
     marginRight: 8,
   },
-  activeFilterChip: {
-    backgroundColor: Colors.primary,
+  activeChip: {
+    backgroundColor: Colors.primary, // Blue background
+    borderColor: Colors.primary,
   },
   filterText: {
     fontSize: 14,
+    color: '#666',
     fontWeight: '600',
-    color: '#4E5968',
   },
   activeFilterText: {
-    color: Colors.white,
+    color: '#FFF',
   },
-  feedCountContainer: {
-      paddingHorizontal: 20,
-      marginBottom: 10,
-      borderBottomWidth: 1,
-      borderBottomColor: '#F2F4F6',
-      paddingBottom: 10,
-  },
-  feedCountText: {
-      fontSize: 12,
-      color: Colors.gray,
-  },
-  listContent: {
-    paddingBottom: 20,
-  },
-  feedCard: {
+
+  // Vertical List Styles
+  listContainer: {
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F2F4F6',
   },
-  feedHeader: {
+  listItem: {
     flexDirection: 'row',
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  listThumbnail: {
+    width: 90,
+    height: 90,
+    borderRadius: 12,
+    backgroundColor: '#EEE',
+  },
+  listContentContainer: {
+    flex: 1,
+    marginLeft: 14,
+    justifyContent: 'center',
+  },
+  listHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
-  },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  badgeBlue: {
-    backgroundColor: '#E8F0FF',
-  },
-  badgeGray: {
-    backgroundColor: '#F2F4F6',
-  },
-  badgeText: {
-    fontSize: 11,
-    color: Colors.primary,
-    fontWeight: '600',
-  },
-  timeText: {
-    fontSize: 12,
-    color: Colors.gray,
-    marginLeft: 'auto',
-  },
-  feedTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.text,
     marginBottom: 6,
   },
-  feedContent: {
-    fontSize: 14,
-    color: '#4E5968',
-    marginBottom: 12,
-    lineHeight: 20,
+  tagBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: '#E5ECFF',
   },
-  contentPlaceholder: {
-      backgroundColor: '#F8F9FA',
-      padding: 15,
-      borderRadius: 12,
-      marginBottom: 12,
-      borderWidth: 1,
-      borderColor: '#EFEFEF'
+  tagBlue: { backgroundColor: '#E5ECFF' },
+  tagRed: { backgroundColor: '#FFE5E5' },
+  tagText: { fontSize: 11, fontWeight: '700' },
+  tagTextBlue: { color: Colors.primary },
+  tagTextRed: { color: Colors.error },
+  
+  dateText: {
+    fontSize: 12,
+    color: '#999',
   },
-  placeholderText: {
-      color: Colors.gray,
-      fontSize: 12,
+  listTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#111',
+    marginBottom: 4,
   },
-  feedImage: {
-      width: '100%',
-      height: 200, // Fixed height for consistency
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: '#EEEEEE',
-      marginBottom: 12,
+  listDesc: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
+    marginBottom: 8,
   },
-  feedFooter: {
+  listFooter: {
     flexDirection: 'row',
   },
-  interaction: {
+  iconRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 12,
   },
-  interactionText: {
+  iconText: {
     fontSize: 12,
-    color: Colors.gray,
+    color: '#666',
     marginLeft: 4,
   },
 });
