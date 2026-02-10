@@ -1,4 +1,3 @@
-import { Colors } from '@/src/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -8,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function ReviewScreen() {
     const router = useRouter();
     
-    // State for interactive elements
+    // 별점 및 선택 상태 관리
     const [realismRating, setRealismRating] = useState(0);
     const [confidenceRating, setConfidenceRating] = useState(0);
     const [selectedRisks, setSelectedRisks] = useState<string[]>([]);
@@ -23,8 +22,9 @@ export default function ReviewScreen() {
         }
     };
 
+    // [핵심] 리뷰 남기기 버튼 클릭 시 '결과 화면'으로 이동
     const handleSubmit = () => {
-        // In a real app, send data to backend here
+        // 방금 새로 만든 result.tsx 화면으로 보냅니다.
         router.push('/gallery/result');
     };
 
@@ -37,22 +37,22 @@ export default function ReviewScreen() {
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()}>
-                    <Ionicons name="close" size={24} color="#111" />
+                    <Ionicons name="close" size={28} color="#111" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>콘텐츠 리뷰</Text>
-                <View style={{ width: 24 }} />
+                <View style={{ width: 28 }} />
             </View>
 
-            <ScrollView contentContainerStyle={styles.content}>
-                {/* Intro */}
+            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                {/* 인트로 안내 */}
                 <View style={styles.introContainer}>
-                     <Ionicons name="chatbubble" size={30} color="#2B5CFF" style={{ marginBottom: 10 }} />
+                     <Ionicons name="chatbubble-ellipses" size={40} color="#0055FF" style={{ marginBottom: 15 }} />
                      <Text style={styles.title}>
-                         방금 체험한 <Text style={{ color: '#2B5CFF' }}>콘텐츠</Text>를{'\n'}평가해주세요.
+                         방금 체험한 <Text style={{ color: '#0055FF' }}>콘텐츠</Text>를{'\n'}평가해주세요.
                      </Text>
                 </View>
 
-                {/* Question 1 */}
+                {/* 질문 1: 현실감 별점 */}
                 <View style={styles.section}>
                     <Text style={styles.question}>현실감 있는 시나리오였나요?</Text>
                     <View style={styles.stars}>
@@ -60,15 +60,15 @@ export default function ReviewScreen() {
                             <TouchableOpacity key={star} onPress={() => setRealismRating(star)}>
                                 <Ionicons 
                                     name={star <= realismRating ? "star" : "star-outline"} 
-                                    size={36} 
-                                    color="#FFD700" 
+                                    size={40} 
+                                    color={star <= realismRating ? "#FFD700" : "#E5E5EA"} 
                                 />
                             </TouchableOpacity>
                         ))}
                     </View>
                 </View>
 
-                 {/* Question 2 */}
+                 {/* 질문 2: 자신감 별점 */}
                  <View style={styles.section}>
                     <Text style={styles.question}>실제 상황에서 안전하게 대응할{'\n'}자신이 생겼나요?</Text>
                     <View style={styles.stars}>
@@ -76,15 +76,15 @@ export default function ReviewScreen() {
                             <TouchableOpacity key={star} onPress={() => setConfidenceRating(star)}>
                                 <Ionicons 
                                     name={star <= confidenceRating ? "star" : "star-outline"} 
-                                    size={36} 
-                                    color="#FFD700" 
+                                    size={40} 
+                                    color={star <= confidenceRating ? "#FFD700" : "#E5E5EA"} 
                                 />
                             </TouchableOpacity>
                         ))}
                     </View>
                 </View>
 
-                {/* Risk Factors */}
+                {/* 위험 요소 선택 (칩 스타일) */}
                 <View style={styles.section}>
                      <Text style={styles.question}>(선택 사항){'\n'}가장 위험하게 느껴졌던 요소는 무엇인가요?</Text>
                      <View style={styles.chipContainer}>
@@ -105,9 +105,9 @@ export default function ReviewScreen() {
                      </View>
                 </View>
 
-                <View style={{ height: 40 }} />
+                <View style={{ height: 20 }} />
 
-                 {/* Submit Button */}
+                 {/* 리뷰 남기기 버튼 */}
                  <TouchableOpacity 
                     style={[styles.submitButton, !isFormValid && styles.disabledButton]}
                     onPress={handleSubmit}
@@ -115,101 +115,27 @@ export default function ReviewScreen() {
                  >
                      <Text style={styles.submitText}>리뷰 남기기</Text>
                  </TouchableOpacity>
-
             </ScrollView>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: Colors.white,
-    },
-    header: {
-        height: 56,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        backgroundColor: Colors.white,
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#111',
-    },
-    content: {
-        padding: 20,
-        paddingBottom: 40,
-    },
-    introContainer: {
-        alignItems: 'center',
-        marginBottom: 40,
-        marginTop: 20,
-    },
-    title: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        textAlign: 'center',
-        lineHeight: 32,
-    },
-    section: {
-        marginBottom: 40,
-        alignItems: 'center',
-    },
-    question: {
-        fontSize: 18,
-        fontWeight: '600',
-        textAlign: 'center',
-        marginBottom: 15,
-        lineHeight: 26,
-        color: '#111',
-    },
-    stars: {
-        flexDirection: 'row',
-        gap: 10,
-    },
-    chipContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-        gap: 10,
-    },
-    chip: {
-        paddingVertical: 12,
-        paddingHorizontal: 20,
-        backgroundColor: '#F5F6F8',
-        borderRadius: 24,
-        borderWidth: 1,
-        borderColor: '#F5F6F8',
-    },
-    chipActive: {
-        backgroundColor: '#E8F0FF',
-        borderColor: '#2B5CFF',
-    },
-    chipText: {
-        color: '#555',
-        fontWeight: '500',
-        fontSize: 15,
-    },
-    chipTextActive: {
-        color: '#2B5CFF',
-        fontWeight: '600',
-    },
-    submitButton: {
-        backgroundColor: '#2B5CFF',
-        height: 56,
-        borderRadius: 16,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    disabledButton: {
-        backgroundColor: '#C7C7CC',
-    },
-    submitText: {
-        color: 'white',
-        fontSize: 18,
-        fontWeight: 'bold',
-    },
+    container: { flex: 1, backgroundColor: '#FFFFFF' },
+    header: { height: 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20 },
+    headerTitle: { fontSize: 18, fontWeight: 'bold' },
+    content: { paddingHorizontal: 24, paddingBottom: 40 },
+    introContainer: { alignItems: 'center', marginVertical: 40 },
+    title: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', lineHeight: 34 },
+    section: { marginBottom: 45, alignItems: 'center' },
+    question: { fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 20, lineHeight: 26 },
+    stars: { flexDirection: 'row', gap: 12 },
+    chipContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 },
+    chip: { paddingVertical: 14, paddingHorizontal: 22, backgroundColor: '#F5F6F8', borderRadius: 30 },
+    chipActive: { backgroundColor: '#E8F0FF', borderWidth: 1, borderColor: '#0055FF' },
+    chipText: { color: '#666', fontSize: 15, fontWeight: '500' },
+    chipTextActive: { color: '#0055FF', fontWeight: 'bold' },
+    submitButton: { backgroundColor: '#0055FF', height: 64, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginTop: 10 },
+    disabledButton: { backgroundColor: '#E5E5EA' },
+    submitText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
 });

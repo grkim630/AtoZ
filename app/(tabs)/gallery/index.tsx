@@ -1,10 +1,10 @@
-import { Colors } from '@/src/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useRouter } from 'expo-router';
 import React from 'react';
-import { Dimensions, ImageBackground, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Dimensions, Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Colors } from '../../../src/constants/Colors';
 
 const { width } = Dimensions.get('window');
 
@@ -38,7 +38,7 @@ export default function GalleryScreen() {
         {/* Large Cards */}
         <Pressable onPress={() => router.push('/gallery/phone_list')} style={styles.cardContainer}>
              <ImageBackground
-                source={require('../../assets/images/Rectangle 12.png')}
+                source={require('../../../assets/images/Rectangle 12.png')}
                 style={styles.cardInfo}
                 imageStyle={{ borderRadius: 20 }}
                 resizeMode="cover"
@@ -54,7 +54,7 @@ export default function GalleryScreen() {
 
         <Pressable onPress={() => router.push('/gallery/message_list')} style={styles.cardContainer}>
             <ImageBackground
-                source={require('../../assets/images/Rectangle 14.png')}
+                source={require('../../../assets/images/Rectangle 14.png')}
                 style={styles.cardInfo}
                 imageStyle={{ borderRadius: 20 }}
                 resizeMode="cover"
@@ -82,8 +82,11 @@ export default function GalleryScreen() {
                 end={{ x: 1, y: 0 }}
             >
                 <View style={styles.sirenContainer}>
-                    {/* Using an icon for Siren, realistically would be an image */}
-                    <Ionicons name="warning" size={32} color="#FF4D4D" /> 
+                    <Image 
+                        source={require('../../../assets/images/siren.png')}
+                        style={{ width: 40, height: 40 }}
+                        resizeMode="contain"
+                    />
                 </View>
                 <View style={styles.guideTextContainer}>
                     <Text style={styles.guideSubtitle}>범행 종류 · 단계별</Text>
