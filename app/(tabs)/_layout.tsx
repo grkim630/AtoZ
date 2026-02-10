@@ -1,57 +1,95 @@
+import { Tabs } from 'expo-router';
 import React from 'react';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Link, Tabs } from 'expo-router';
-import { Pressable } from 'react-native';
+import { Platform } from 'react-native';
 
-import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
-
-// You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
-function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>['name'];
-  color: string;
-}) {
-  return <FontAwesome size={28} style={{ marginBottom: -3 }} {...props} />;
-}
+import { TabIcons } from '@/src/constants/Icons';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        // Disable the static render of the header on web
-        // to prevent a hydration error in React Navigation v6.
-        headerShown: useClientOnlyValue(false, true),
+        tabBarActiveTintColor: '#2B5CFF', // Fixed Main Blue
+        tabBarInactiveTintColor: '#A6A6A6',
+        headerShown: false,
+        tabBarStyle: Platform.select({
+          ios: {
+            backgroundColor: '#FFFFFF',
+            borderTopColor: '#F2F2F2',
+            borderTopWidth: 1,
+            height: 90, // Adjusted height
+            paddingTop: 10,
+            paddingBottom: 30, // Increased padding
+            shadowColor: '#000',
+            shadowOffset: {
+              width: 0,
+              height: -2,
+            },
+            shadowOpacity: 0.05,
+            shadowRadius: 4,
+          },
+          default: {
+            backgroundColor: '#FFFFFF',
+            borderTopColor: '#F2F2F2',
+            borderTopWidth: 1,
+            height: 70,
+            paddingTop: 10,
+            paddingBottom: 10,
+          },
+        }),
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '500',
+          marginTop: 4,
+        },
       }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable>
-                {({ pressed }) => (
-                  <FontAwesome
-                    name="info-circle"
-                    size={25}
-                    color={Colors[colorScheme ?? 'light'].text}
-                    style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
-          ),
+          title: '홈',
+          tabBarIcon: ({ focused }) => {
+             const Icon = focused ? TabIcons.Home.Active : TabIcons.Home.Inactive;
+             return <Icon width={24} height={24} />;
+          },
         }}
       />
       <Tabs.Screen
-        name="two"
+        name="community"
         options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          title: '커뮤니티',
+          tabBarIcon: ({ focused }) => {
+            const Icon = focused ? TabIcons.Community.Active : TabIcons.Community.Inactive;
+            return <Icon width={24} height={24} />;
+          },
+        }}
+      />
+      <Tabs.Screen
+        name="news"
+        options={{
+          title: '피싱 뉴스',
+          tabBarIcon: ({ focused }) => {
+             const Icon = focused ? TabIcons.News.Active : TabIcons.News.Inactive;
+             return <Icon width={24} height={24} />;
+          },
+        }}
+      />
+      <Tabs.Screen
+        name="gallery"
+        options={{
+          title: '피싱 갤러리',
+          tabBarIcon: ({ focused }) => {
+             const Icon = focused ? TabIcons.Gallery.Active : TabIcons.Gallery.Inactive;
+             return <Icon width={24} height={24} />;
+          },
+        }}
+      />
+      <Tabs.Screen
+        name="mypage"
+        options={{
+          title: '마이 페이지',
+          tabBarIcon: ({ focused }) => {
+             const Icon = focused ? TabIcons.MyPage.Active : TabIcons.MyPage.Inactive;
+             return <Icon width={24} height={24} />;
+          },
         }}
       />
     </Tabs>
