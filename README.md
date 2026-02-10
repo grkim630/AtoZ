@@ -10,6 +10,7 @@
 1. 프로젝트 개요
 2. 협업 규칙 & Git 전략
 3. 개발 환경 & 실행 가이드
+3-0. (중요) Gitignore로 제외된 “필수 로컬 파일” 준비
 4. 시스템 아키텍처
 5. 아키텍처 개요 설명
 6. 데이터 흐름
@@ -55,6 +56,47 @@
 ## 3. 개발 환경 & 실행 가이드 (Onboarding Layer)
 > 새 팀원이 30분 안에 실행 가능한 수준을 목표로 합니다.
 
+### 3-0) (중요) Gitignore로 제외된 “필수 로컬 파일” 준비
+
+이 저장소는 보안/용량 이유로 아래 파일들을 `.gitignore`로 제외합니다.  
+따라서 **처음 클론한 사람은 반드시 아래를 로컬에서 생성/준비**해야 정상 실행됩니다.
+
+- 원칙: `.env`는 커밋/공유 금지, 대신 `.env.example`을 복사해서 개인 키를 채웁니다.
+- 모델/가중치(예: `*.pt`)는 용량이 커서 기본적으로 커밋하지 않습니다(필요 시 별도 공유 경로 또는 학습으로 생성).
+
+#### 필수/선택 로컬 파일 체크리스트
+
+| 경로 | 상태 | 용도 | 준비 방법 |
+|---|---|---|---|
+| `backend/server/.env` | 필수 | NestJS API 실행 | `backend/server/.env.example` → `.env` 복사 후 값 채우기 |
+| `frontend/.env` | 필수 | 앱에서 API 주소 설정 | `frontend/.env.example` 참고해 `.env` 생성 후 PC IP/포트 채우기 |
+| `backend/python/extraction/.env` | 필수(분석 사용 시) | OpenAI 키 등 분석 파이프라인 | `backend/python/extraction/.env.example` → `.env` 복사 |
+| `backend/python/phishing_simulation/.env` | 선택(체험 기능 사용 시) | 전화/문자 체험(시뮬레이션) | `backend/python/phishing_simulation/.env.example` → `.env` 복사 |
+| `backend/python/evaluation/weights/kobert.pt` | 선택(평가 기능 사용 시) | KoBERT 위험도 평가 | 팀 공유본을 받거나 `backend/python/evaluation/README.md`대로 학습해 생성 |
+
+#### 빠른 생성 커맨드 (PowerShell)
+
+```powershell
+cd C:\phishing-experience\phishing-experience
+
+# 1) NestJS 서버 .env
+copy .\backend\server\.env.example .\backend\server\.env
+
+# 2) Python extraction .env
+copy .\backend\python\extraction\.env.example .\backend\python\extraction\.env
+
+# 3) Python phishing_simulation .env (체험 기능 쓸 때만)
+copy .\backend\python\phishing_simulation\.env.example .\backend\python\phishing_simulation\.env
+
+# 4) Frontend .env (예시 파일 참고해서 생성)
+copy .\frontend\.env.example .\frontend\.env
+```
+
+#### 자주 막히는 포인트
+
+- `frontend/.env`에서 `localhost`/`127.0.0.1`는 **실기기에서 동작하지 않습니다.** 같은 Wi-Fi의 PC LAN IP로 설정하세요.
+- 포트 충돌: `phishing_simulation`이 기본 `8010`을 사용합니다. `evaluation`을 동시에 띄우면 `evaluation`은 `8020` 등 다른 포트를 권장합니다.
+
 ### 백엔드 (NestJS)
 **PowerShell 기준**
 ```bash
@@ -78,7 +120,7 @@ npm run start:dev
 `backend/python/extraction/.venv`의 Python만 허용됩니다. (시스템 Python 차단)
 ```bash
 cd C:\phishing-experience\phishing-experience\backend\python\extraction
-python -m venv .venv
+py -3.12 -m venv .venv
 .\.venv\Scripts\pip install -r requirements.txt
 ```
 
@@ -97,7 +139,7 @@ npm run frontend:start
 
 ### Windows 주의사항
 - PowerShell에서 경로 구분자(`\`) 사용
-- Expo 앱에서 로컬 API 접근 시 `EXPO_PUBLIC_API_BASE_URL`를 내부 IP로 설정
+- Expo 앱에서 로컬 API 접근 시 `EXPO_PUBLIC_API_BASE_URL`, `EXPO_PUBLIC_SIMULATION_API_BASE_URL`를 내부 IP로 설정
 
 ### 보안 주의사항
 - `.env`는 절대 공유/커밋 금지
@@ -108,7 +150,7 @@ npm run frontend:start
 ## 4. 시스템 아키텍처 (Architecture Layer)
 ### 폴더 구조 요약
 ```
-see_see_call_call/
+phishing-experience/
 ├─ backend/
 │  ├─ server/                # NestJS 백엔드
 │  │  ├─ src/                 # NestJS 소스
@@ -118,7 +160,8 @@ see_see_call_call/
 │  └─ python/                # Python(STT/OCR/LLM, 평가 모델 등)
 │     ├─ extraction/          # STT/OCR/LLM 추출·정리 파이프라인
 │     │  └─ src/              # 파이썬 모듈(패키지)
-│     └─ evaluation/          # (선택) KoBERT 기반 평가 API
+│     ├─ evaluation/          # (선택) KoBERT 기반 평가 API
+│     └─ phishing_simulation/ # (선택) 전화/문자 체험 FastAPI
 ├─ frontend/                 # Expo(React Native) 앱
 ├─ example/                  # 예시 음성/이미지/텍스트 파일
 └─ package.json              # 루트 실행 스크립트(backend/server, frontend 래핑)
@@ -364,12 +407,13 @@ SQLite (기본) 또는 PostgreSQL (Prisma)
 
 ### 프론트엔드 (`frontend/.env`)
 - `EXPO_PUBLIC_API_BASE_URL` (예: `http://192.168.0.10:3000`)
+- `EXPO_PUBLIC_SIMULATION_API_BASE_URL` (예: `http://192.168.0.10:8010`)
 
 ### Python (`backend/python/extraction/.env`)
 - `OPENAI_API_KEY`
 - `NAVER_OCR_SECRET` (선택)
 - `NAVER_OCR_INVOKE_URL` (선택)
-- `EVALUATION_API_URL` (선택, `evaluation` 서버 주소)
+- `EVALUATION_API_URL` (선택, `evaluation` 서버 주소. `phishing_simulation`과 포트 충돌을 피하려면 `8020` 등으로 분리 권장)
 - `EVALUATION_API_TIMEOUT_SECONDS` (선택)
 
 ---
@@ -380,9 +424,11 @@ SQLite (기본) 또는 PostgreSQL (Prisma)
    - 기본 로컬은 SQLite(`file:./prisma/dev.db`)로 바로 실행 가능합니다.
 2. Python venv 준비 (`backend/python/extraction/.venv`)
 3. Python venv 준비 (`backend/python/evaluation/.venv`) + KoBERT 가중치(`weights/kobert.pt`) 준비
-4. (선택) `evaluation` API 사용 시 `backend/python/evaluation` 실행 + `EVALUATION_API_URL` 설정
-5. NestJS 백엔드 실행 (`npm run start:dev`)
-6. Expo 앱 실행 (`frontend`에서 `npm run start` 또는 `npm run frontend:start`)
+4. (선택) `evaluation` API 사용 시 `backend/python/evaluation` 실행 + `EVALUATION_API_URL` 설정  
+   - `phishing_simulation`을 함께 쓰는 경우 `evaluation`은 `8020` 등 다른 포트 권장
+5. (선택) 전화/문자 체험 기능 사용 시 `backend/python/phishing_simulation` 실행(기본 `8010`)
+6. NestJS 백엔드 실행 (`npm run start:dev`)
+7. Expo 앱 실행 (`frontend`에서 `npm run start` 또는 `npm run frontend:start`)
 
 ---
 

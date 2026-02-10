@@ -117,9 +117,19 @@ export default function MessageListScreen() {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('신고순');
 
-  const navigateToChat = (type: string) => {
-      // Navigate to chat simulation
-      router.push({ pathname: '/gallery/message_chat', params: { type } });
+  const navigateToChat = (item: typeof SCENARIOS[0]) => {
+      // Map frontend category to backend category
+      const categoryMap: Record<string, string> = {
+        'romance': '로맨스스캠 메세지',
+        'job': '부업 피싱 메세지',
+        'sns': 'SNS 제안 메세지',
+      };
+      const category = categoryMap[item.type] ?? item.title;
+      
+      router.push({
+        pathname: '/gallery/message_chat',
+        params: { category, difficulty: '2' },
+      });
   };
 
   return (
@@ -162,7 +172,7 @@ export default function MessageListScreen() {
                 <ScenarioItem 
                     key={item.id} 
                     item={item} 
-                    onPress={() => navigateToChat(item.type)} 
+                    onPress={() => navigateToChat(item)} 
                 />
            ))}
       </ScrollView>

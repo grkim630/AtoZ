@@ -461,9 +461,26 @@ buck-out/
 backend/server/uploads/
 
 # Local SQLite DB used in dev
+backend/server/prisma/dev.db
 backend/server/prisma/prisma/dev.db
+backend/server/prisma/*.db*
+backend/server/prisma/*.sqlite*
 backend/server/prisma/prisma/*.db*
 backend/server/prisma/prisma/*.sqlite*
+
+# Nest build output (redundant with generic dist, but explicit)
+backend/server/dist/
+
+# Expo prebuild output (generated)
+frontend/android/
+frontend/ios/
+frontend/.expo-shared/
+frontend/web-build/
+
+# Local editor/project settings
+.vscode/
+.cursor/
+*.code-workspace
 
 # Extra env variants (keep examples tracked)
 .env.*
@@ -474,6 +491,14 @@ backend/server/prisma/prisma/*.sqlite*
 backend/python/evaluation/weights/*.pt
 backend/python/evaluation/weights/*.pth
 backend/python/evaluation/weights/*.onnx
+
+# Broader Python ML artifacts (covers newly added python folders too)
+backend/python/**/weights/
+backend/python/**/models/
+backend/python/**/*.pt
+backend/python/**/*.pth
+backend/python/**/*.onnx
+backend/python/**/*.safetensors
 
 # Windows OS noise
 Thumbs.db

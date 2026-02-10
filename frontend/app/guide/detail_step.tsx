@@ -11,22 +11,70 @@ import { SafeAreaView } from 'react-native-safe-area-context';
   Matches Image 14.22.16 ref.
 */
 
-const STEPS = [
-    {
-        step: 1,
-        text: '인터넷으로 대출 신청시에는 해당 업체 사이트에 등록번호·전화 번호·주소 등이 명확히 기재되어 있는지 확인하세요.',
-    },
-    {
-        step: 2,
-        text: '금감원 홈페이지를 통해 제도권 금융회사 여부를 반드시 조회하세요.',
-    },
-    {
-        step: 3,
-        text: '피해가 발생했다면, 경찰(112), 금감원(1332), 금융회사에 전화해 신속히 피해신고 및 지급정지를 요청해주세요.',
-    },
-];
+type Step = { step: 1 | 2 | 3; text: string };
 
-const StepItem = ({ item, isLast }: { item: typeof STEPS[0], isLast: boolean }) => (
+function getSteps(type: unknown): Step[] {
+    const t = Array.isArray(type) ? type[0] : type;
+
+    if (t === 'impersonation') {
+        return [
+            {
+                step: 1,
+                text: '검찰·경찰·금융기관을 사칭하며 “수사/보안”을 말해도, 전화를 끊고 먼저 침착하게 상황을 정리하세요.',
+            },
+            {
+                step: 2,
+                text: '기관 확인은 상대가 준 번호가 아니라 공식 대표번호(홈페이지/포털/안내문)로 다시 걸어 사실 여부를 확인하세요.',
+            },
+            {
+                step: 3,
+                text: '계좌 이체·현금 전달·앱 설치를 요구받았거나 이미 응했다면 즉시 112/금융사에 신고하고 지급정지를 요청하세요.',
+            },
+        ];
+    }
+
+    if (t === 'loan') {
+        return [
+            {
+                step: 1,
+                text: '대출을 빙자해 “수수료/보증금/선입금”을 요구하면 즉시 의심하고, 돈을 보내기 전 거래를 중단하세요.',
+            },
+            {
+                step: 2,
+                text: '대출 상담은 문자 링크가 아닌 공식 앱/공식 홈페이지에서 진행하고, 서류·계좌 안내는 대표번호로 재확인하세요.',
+            },
+            {
+                step: 3,
+                text: '이미 송금했다면 금융사에 지급정지를 요청하고, 대화/입금 내역을 보관해 112에 피해 신고하세요.',
+            },
+        ];
+    }
+
+    if (t === 'romance') {
+        return [
+            {
+                step: 1,
+                text: '로맨스 스캠은 빠르게 친밀감을 쌓고 “급한 사정”으로 돈·선물·송금을 요구합니다. 감정적 압박이 오면 멈추세요.',
+            },
+            {
+                step: 2,
+                text: '프로필·사진·영상통화는 조작될 수 있습니다. 신분·직업·사고 상황은 독립적으로 검증하고 개인정보 공유를 피하세요.',
+            },
+            {
+                step: 3,
+                text: '금전 요구/투자 권유/링크 유도 징후가 있으면 즉시 차단하고, 송금했다면 금융사·112에 신고해 추가 피해를 막으세요.',
+            },
+        ];
+    }
+
+    return [
+        { step: 1, text: '의심스러운 연락은 즉시 대화를 멈추고, 링크 클릭/개인정보 제공을 피하세요.' },
+        { step: 2, text: '사실 확인은 상대가 준 번호가 아닌 공식 채널을 통해 직접 확인하세요.' },
+        { step: 3, text: '피해가 의심되면 112 및 해당 금융사에 신고하고 지급정지 등 조치를 요청하세요.' },
+    ];
+}
+
+const StepItem = ({ item, isLast }: { item: Step, isLast: boolean }) => (
     <View style={styles.stepContainer}>
         {/* Timeline Side */}
         <View style={styles.timelineContainer}>
@@ -82,8 +130,8 @@ export default function GuideDetailStepScreen() {
            </Text>
 
            <View style={styles.list}>
-               {STEPS.map((step, index) => (
-                   <StepItem key={step.step} item={step} isLast={index === STEPS.length - 1} />
+               {getSteps(type).map((step, index, arr) => (
+                   <StepItem key={step.step} item={step} isLast={index === arr.length - 1} />
                ))}
            </View>
             

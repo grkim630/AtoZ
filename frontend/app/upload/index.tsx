@@ -562,6 +562,50 @@ const styles = StyleSheet.create({
       backgroundColor: 'rgba(0,0,0,0.05)',
       width: '100%',
   },
+  signalRow: {
+      gap: 10,
+  },
+  signalTitle: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: '#0029A3',
+  },
+  signalChips: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+  },
+  signalChip: {
+      backgroundColor: 'rgba(255,255,255,0.7)',
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderWidth: 1,
+      borderColor: 'rgba(0,0,0,0.06)',
+  },
+  signalChipText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: '#333',
+  },
+  previewBox: {
+      backgroundColor: 'rgba(255,255,255,0.7)',
+      borderRadius: 16,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(0,0,0,0.06)',
+      gap: 6,
+  },
+  previewTitle: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: '#0029A3',
+  },
+  previewText: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: '#333',
+  },
   verdictText: {
       fontSize: 15,
       lineHeight: 24,

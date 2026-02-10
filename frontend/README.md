@@ -40,6 +40,8 @@ npm run ios
 npm run web
 ```
 
+> 참고: 현재 `frontend/package.json`의 스크립트는 위 4개(start/android/ios/web)만 정의되어 있습니다.
+
 ---
 
 ## 3) 환경 변수
@@ -48,15 +50,17 @@ npm run web
 
 ```env
 EXPO_PUBLIC_API_BASE_URL=http://<백엔드_주소>:3000
+EXPO_PUBLIC_SIMULATION_API_BASE_URL=http://<시뮬레이션_서버_주소>:8010
 ```
 
 예시:
 
 ```env
 EXPO_PUBLIC_API_BASE_URL=http://192.168.0.10:3000
+EXPO_PUBLIC_SIMULATION_API_BASE_URL=http://192.168.0.10:8010
 ```
 
-> 모바일 기기 테스트 시 `localhost` 대신 **백엔드가 떠 있는 PC의 로컬 IP**를 사용해야 합니다.
+> 모바일 기기 테스트 시 `localhost` 대신 **서버가 떠 있는 PC의 LAN IP**를 사용해야 합니다.
 
 ---
 
@@ -186,3 +190,4 @@ frontend/
 
 - 루트 통합 문서: `../README.md`
 - 프론트 서비스 연동 핵심: `src/services/analysisService.ts`
+ - 시뮬레이션 API 연동(전화/문자 체험): `src/services/phishingSimulationService.ts`

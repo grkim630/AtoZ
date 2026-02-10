@@ -34,6 +34,8 @@ export default function TabLayout() {
             height: 70,
             paddingTop: 10,
             paddingBottom: 10,
+            // Move tab bar slightly upward
+            marginBottom: 8,
           },
         }),
         tabBarLabelStyle: {

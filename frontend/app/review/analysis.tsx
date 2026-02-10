@@ -136,7 +136,7 @@ export default function ReviewScreen() {
                         <Text style={styles.summaryMain}>시시콜콜님은 <Text style={styles.blueBold}>'대응 고수'</Text>시네요!</Text>
                         <Text style={styles.summarySub}>평균 대비 <Text style={styles.blueText}>24%</Text> 잘 대처했어요.</Text>
                     </View>
-                    <TouchableOpacity style={styles.blueButton}>
+                    <TouchableOpacity style={styles.blueButton} onPress={() => router.push('/guide/category')}>
                         <Text style={styles.btnText}>대응안 확인하기</Text>
                     </TouchableOpacity>
                 </View>

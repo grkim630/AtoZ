@@ -53,7 +53,10 @@ export default function PhoneGalleryScreen() {
                 <View key={index} style={styles.cardContainer}>
                     <Pressable 
                         style={styles.card}
-                        onPress={() => router.push('/gallery/simulation')}
+                        onPress={() => router.push({
+                          pathname: '/gallery/simulation',
+                          params: { category: item.title, difficulty: '2' }
+                        })}
                     >
                         {/* Background Image Placeholder */}
                         <View style={[styles.cardBg, { backgroundColor: item.bg }]} />

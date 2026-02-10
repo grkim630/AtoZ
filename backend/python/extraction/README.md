@@ -46,7 +46,7 @@ py -3.12 -m venv .venv
 ```env
 OPENAI_API_KEY=...
 # (선택) evaluation API 서버 주소
-EVALUATION_API_URL=http://127.0.0.1:8010
+EVALUATION_API_URL=http://127.0.0.1:8020
 EVALUATION_API_TIMEOUT_SECONDS=5
 ```
 
@@ -96,16 +96,18 @@ curl -X POST http://127.0.0.1:8000/ingest/text -H "Content-Type: application/jso
 
 `EVALUATION_API_URL`이 설정되어 있으면, clean text를 `evaluation`의 `/evaluate`로 보내서 `evalLabel`, `evalRiskScore`를 결과에 합쳐줍니다.
 
+> 주의: 이 프로젝트에는 전화/문자 체험용 `phishing_simulation` FastAPI가 기본 `8010`을 사용합니다. `evaluation`까지 동시에 띄우려면 포트를 분리(예: `8020`)하세요.
+
 1) `evaluation` API 서버 실행:
 
 ```powershell
 cd C:\phishing-experience\phishing-experience\backend\python\evaluation
-.\.venv\Scripts\python.exe -m uvicorn api:app --host 127.0.0.1 --port 8010
+.\.venv\Scripts\python.exe -m uvicorn api:app --host 127.0.0.1 --port 8020
 ```
 
 2) `extraction/.env`에 추가:
 
 ```env
-EVALUATION_API_URL=http://127.0.0.1:8010
+EVALUATION_API_URL=http://127.0.0.1:8020
 ```
 

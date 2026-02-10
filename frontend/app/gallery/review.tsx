@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { getSimulationOutcome } from '@/src/services/simulationOutcomeStore';
 
 export default function ReviewScreen() {
     const router = useRouter();
+    const params = useLocalSearchParams<{ outcome?: string }>();
     
     // 별점 및 선택 상태 관리
     const [realismRating, setRealismRating] = useState(0);
@@ -25,7 +27,10 @@ export default function ReviewScreen() {
     // [핵심] 리뷰 남기기 버튼 클릭 시 '결과 화면'으로 이동
     const handleSubmit = () => {
         // 방금 새로 만든 result.tsx 화면으로 보냅니다.
-        router.push('/gallery/result');
+        router.push({
+            pathname: '/gallery/result',
+            params: { outcome: params.outcome ?? getSimulationOutcome() ?? 'unknown' },
+        });
     };
 
     const isFormValid = realismRating > 0 && confidenceRating > 0;

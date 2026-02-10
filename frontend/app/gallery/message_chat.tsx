@@ -3,8 +3,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
+    ActivityIndicator,
     Animated,
     FlatList,
+    Keyboard,
     KeyboardAvoidingView,
     Platform,
     StyleSheet,
@@ -14,6 +16,14 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  createMessageSession,
+  sendMessageReply,
+  type CreateMessageSessionResponse,
+  type ReplyResponse,
+} from '@/src/services/phishingSimulationService';
+import { mapMessageCategory, DEFAULT_MESSAGE_CATEGORY } from '@/src/services/categoryMapper';
+import { setSimulationOutcome } from '@/src/services/simulationOutcomeStore';
 
 type Message = {
   id: string;
@@ -24,26 +34,100 @@ type Message = {
 
 export default function MessageChatScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams();
+  const params = useLocalSearchParams<{ category?: string; difficulty?: string }>();
   const flatListRef = useRef<FlatList>(null);
   
-  // Initial scenario setup based on params or default
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: '안녕하세요.\n저는 시시라고 합니다.\n당신과 대화하고 싶어요.',
-      sender: 'ai',
-      timestamp: new Date(),
-    },
-  ]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [showWarning, setShowWarning] = useState(false);
+  const [endNoticeVisible, setEndNoticeVisible] = useState(false);
+  const [endNoticeText, setEndNoticeText] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [shouldEnd, setShouldEnd] = useState(false);
+  const suspicionCountRef = useRef(0);
+  const [kavKey, setKavKey] = useState(0);
   
   // Warning Animation
   const warningOpacity = useRef(new Animated.Value(0)).current;
 
   // PII Keywords (Korean & English)
   const PII_KEYWORDS = ['이름', '전화번호', '계좌', '비밀번호', '주소', 'name', 'phone', 'account', 'password', 'address', 'card', '카드'];
+
+  const endWithOutcome = (outcome: 'success' | 'failure') => {
+    setSimulationOutcome(outcome);
+    setShouldEnd(true);
+
+    if (outcome === 'success') {
+      setEndNoticeText('피싱 예방에 성공하여 대화를 종료합니다.');
+    } else {
+      setEndNoticeText('피싱 예방에 주의를 기울여주세요!');
+    }
+
+    setEndNoticeVisible(true);
+    setTimeout(() => {
+      setEndNoticeVisible(false);
+      router.replace({
+        pathname: '/gallery/review',
+        params: { outcome },
+      });
+    }, 2000);
+  };
+
+  const classifyUserUtterance = (text: string): { suspicious: boolean; compromise: boolean } => {
+    const t = (text ?? '').toLowerCase();
+    const neg = /(안|못|절대)\s*(눌|클릭|접속|설치|다운|송금|이체|입금|보냈|제공|알려)/;
+    const suspicious = /(피싱|보이스\s*피싱|사기|의심|수상|이상|신고|112|1332|무시|차단|삭제|대화\s*종료)/.test(t);
+    const compromise =
+      !neg.test(t) &&
+      /(링크|url|클릭|눌렀|접속|앱|설치|다운|송금|이체|입금|계좌번호|카드번호|비밀번호|인증번호|otp|주민등록|신분증|원격|anydesk|teamviewer|팀뷰어)/.test(t);
+    return { suspicious, compromise };
+  };
+
+  // 세션 초기화
+  useEffect(() => {
+    const initSession = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const category = mapMessageCategory(params.category ?? '') ?? DEFAULT_MESSAGE_CATEGORY;
+        const difficulty = parseInt(params.difficulty ?? '2', 10) as 1 | 2 | 3;
+        
+        const session: CreateMessageSessionResponse = await createMessageSession({
+          category,
+          difficulty,
+          recommended_delay_seconds_min: 2,
+          recommended_delay_seconds_max: 4,
+        });
+        
+        setSessionId(session.sessionId);
+        
+        // 첫 AI 메시지를 권장 지연 후 표시
+        setTimeout(() => {
+          setMessages([
+            {
+              id: '0',
+              text: session.firstAssistantMessage,
+              sender: 'ai',
+              timestamp: new Date(),
+            },
+          ]);
+          setLoading(false);
+          setTimeout(() => {
+            flatListRef.current?.scrollToEnd({ animated: true });
+          }, 100);
+        }, session.recommendedDelaySeconds * 1000);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '세션 생성 실패');
+        setLoading(false);
+      }
+    };
+    
+    initSession();
+  }, [params.category, params.difficulty]);
 
   useEffect(() => {
     // Check for PII in real-time
@@ -55,48 +139,87 @@ export default function MessageChatScreen() {
       duration: 300,
       useNativeDriver: true,
     }).start();
-
   }, [inputText]);
 
-  const sendMessage = () => {
-    if (!inputText.trim()) return;
+  // Android에서 키보드가 내려간 뒤 입력창이 약간 위로 남는 현상 방지:
+  // KeyboardAvoidingView를 한 번 리마운트해서 레이아웃을 원복시킵니다.
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidHide', () => {
+      setKavKey((v) => v + 1);
+    });
+    return () => sub.remove();
+  }, []);
+
+  const sendMessage = async () => {
+    if (!inputText.trim() || !sessionId || sending || shouldEnd) return;
+
+    const userText = inputText.trim();
+    setInputText('');
+    setSending(true);
 
     const newMessage: Message = {
       id: Date.now().toString(),
-      text: inputText,
+      text: userText,
       sender: 'user',
       timestamp: new Date(),
     };
 
     setMessages(prev => [...prev, newMessage]);
-    setInputText('');
     
-    // Auto-scroll
     setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
+      flatListRef.current?.scrollToEnd({ animated: true });
     }, 100);
 
-    // Mock AI Response
-    setTimeout(() => {
-        const aiResponse: Message = {
-            id: (Date.now() + 1).toString(),
-            text: getAIResponse(messages.length),
-            sender: 'ai',
-            timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, aiResponse]);
-        setTimeout(() => {
-            flatListRef.current?.scrollToEnd({ animated: true });
-        }, 100);
-    }, 1500);
+    // 종료 포인트(전화와 동일한 규칙):
+    // - 피싱에 넘어감: 즉시 실패 종료
+    // - 2번 이상 의심/차단/무시: 자동 종료가 아니라 "종료 선택지"를 노출
+    const { suspicious, compromise } = classifyUserUtterance(userText);
+    if (compromise) {
+      endWithOutcome('failure');
+      setSending(false);
+      return;
+    }
+    if (suspicious) {
+      suspicionCountRef.current += 1;
+      if (suspicionCountRef.current >= 2) {
+        setShouldEnd(true);
+        setEndNoticeText('피싱이 의심됩니다. 대화를 종료할까요?');
+        setEndNoticeVisible(true);
+        setTimeout(() => setEndNoticeVisible(false), 1500);
+        setSending(false);
+        return;
+      }
+    }
+
+    try {
+      const reply: ReplyResponse = await sendMessageReply(sessionId, userText);
+      
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: reply.assistantText,
+        sender: 'ai',
+        timestamp: new Date(),
+      };
+      
+      setMessages(prev => [...prev, aiMessage]);
+      
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+
+      if (reply.shouldEnd) {
+        setShouldEnd(true);
+        // shouldEnd일 때는 선택지를 보여주고, 사용자가 선택하면 종료합니다.
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '응답 생성 실패');
+    } finally {
+      setSending(false);
+    }
   };
 
-  const getAIResponse = (count: number) => {
-      // Simple scripted flow for demo
-      if (count === 1) return "아 네 안녕하세요."; // User said something
-      if (count === 2) return "저는 이라크에 주둔하고 있는 주한 미군입니다. 당신의 사진을 보고 너무 아름다워서 친구가 되고 싶습니다. 당신의 이름은 무엇입니까?";
-      if (count === 3) return "반가워요. 저는 한국에 살고 있는 25살 콜콜입니다. 당신과 친구가 되고 싶습니다.";
-      return "그렇군요. 혹시 지금 통화 가능하신가요?";
+  const handleEndChoice = (choice: 'safe' | 'comply') => {
+    endWithOutcome(choice === 'safe' ? 'success' : 'failure');
   };
 
   const renderItem = ({ item }: { item: Message }) => {
@@ -135,7 +258,9 @@ export default function MessageChatScreen() {
 
       {/* Sub Header */}
       <View style={styles.subHeader}>
-          <Text style={styles.subHeaderText}>‘로맨스스캠 메세지’를 선택했어요.</Text>
+          <Text style={styles.subHeaderText}>
+            ‘{params.category ?? '메시지 피싱'}’를 선택했어요.
+          </Text>
       </View>
 
       {/* Warning Banner */}
@@ -150,44 +275,103 @@ export default function MessageChatScreen() {
             </View>
       </Animated.View>
 
-      {/* Chat List */}
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderItem}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContent}
-        style={styles.list}
-      />
+      {/* End Notice Banner */}
+      {endNoticeVisible && (
+        <SafeAreaView edges={['top']} style={styles.endNoticeBanner}>
+          <Ionicons name="warning" size={20} color="white" />
+          <Text style={styles.endNoticeText}>{endNoticeText}</Text>
+        </SafeAreaView>
+      )}
 
-      {/* Input Area */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-      >
-        <View style={styles.inputContainer}>
-            <TouchableOpacity style={styles.plusButton}>
-                <Ionicons name="add" size={24} color="#555" />
-            </TouchableOpacity>
-            <View style={styles.inputWrapper}>
-                <TextInput
-                    style={styles.input}
-                    value={inputText}
-                    onChangeText={setInputText}
-                    placeholder="메시지를 입력하세요"
-                    placeholderTextColor="#999"
-                    multiline
-                />
-                <TouchableOpacity onPress={sendMessage} style={styles.sendButton}>
-                     {inputText.trim() ? (
-                         <Ionicons name="arrow-up-circle" size={32} color={Colors.primary} />
-                     ) : (
-                         <Ionicons name="mic-outline" size={24} color="#555" />
-                     )}
-                </TouchableOpacity>
-            </View>
+      {/* Loading State */}
+      {loading && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>세션 준비 중...</Text>
         </View>
-      </KeyboardAvoidingView>
+      )}
+
+      {/* Error State */}
+      {error && !loading && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.retryButtonText}>돌아가기</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Chat + Input (keyboard-aware) */}
+      {!loading && !error && (
+        <KeyboardAvoidingView
+          key={kavKey}
+          style={styles.chatArea}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          // 헤더 높이만큼 오프셋 (키보드가 입력창을 가리는 현상 방지)
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 56 : 0}
+        >
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            renderItem={renderItem}
+            keyExtractor={item => item.id}
+            contentContainerStyle={styles.listContent}
+            style={styles.list}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+          />
+
+          {shouldEnd ? (
+            <View style={styles.choiceContainer}>
+              <TouchableOpacity
+                style={[styles.choiceBtn, styles.safeBtn]}
+                onPress={() => handleEndChoice('safe')}
+              >
+                <Text style={styles.choiceText}>차단/무시하고 종료</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.choiceBtn, styles.dangerBtn]}
+                onPress={() => handleEndChoice('comply')}
+              >
+                <Text style={styles.choiceText}>요구에 응하기</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.inputContainer}>
+              <TouchableOpacity style={styles.plusButton}>
+                <Ionicons name="add" size={24} color="#555" />
+              </TouchableOpacity>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.input}
+                  value={inputText}
+                  onChangeText={setInputText}
+                  placeholder="메시지를 입력하세요"
+                  placeholderTextColor="#999"
+                  multiline
+                  editable={!sending}
+                />
+                <TouchableOpacity
+                  onPress={sendMessage}
+                  style={styles.sendButton}
+                  disabled={!inputText.trim() || sending}
+                >
+                  {sending ? (
+                    <ActivityIndicator size="small" color={Colors.primary} />
+                  ) : inputText.trim() ? (
+                    <Ionicons name="arrow-up-circle" size={32} color={Colors.primary} />
+                  ) : (
+                    <Ionicons name="mic-outline" size={24} color="#555" />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </KeyboardAvoidingView>
+      )}
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#F8F9FA' }} />
     </SafeAreaView>
   );
@@ -197,6 +381,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  chatArea: {
+    flex: 1,
   },
   header: {
     height: 56,
@@ -258,6 +445,25 @@ const styles = StyleSheet.create({
   warningText: {
       color: '#111',
       fontSize: 14,
+  },
+  endNoticeBanner: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: '#FF3B30',
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 200,
+      gap: 8,
+  },
+  endNoticeText: {
+      color: 'white',
+      fontWeight: 'bold',
+      fontSize: 15,
   },
   list: {
       flex: 1,
@@ -351,5 +557,65 @@ const styles = StyleSheet.create({
   },
   sendButton: {
       padding: 4,
+  },
+  choiceContainer: {
+      flexDirection: 'row',
+      gap: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      backgroundColor: '#F8F9FA',
+      borderTopWidth: 1,
+      borderTopColor: '#E5E5EA',
+  },
+  choiceBtn: {
+      flex: 1,
+      height: 48,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+  },
+  safeBtn: {
+      backgroundColor: Colors.primary,
+  },
+  dangerBtn: {
+      backgroundColor: Colors.error,
+  },
+  choiceText: {
+      color: 'white',
+      fontSize: 15,
+      fontWeight: 'bold',
+  },
+  loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 20,
+  },
+  loadingText: {
+      color: '#111',
+      fontSize: 16,
+  },
+  errorContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+      gap: 20,
+  },
+  errorText: {
+      color: Colors.error,
+      fontSize: 16,
+      textAlign: 'center',
+  },
+  retryButton: {
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+      backgroundColor: Colors.primary,
+      borderRadius: 20,
+  },
+  retryButtonText: {
+      color: 'white',
+      fontSize: 16,
+      fontWeight: 'bold',
   },
 });

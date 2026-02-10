@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "sesecallcall",
-    "slug": "sesecallcall",
+    "name": "see see call call",
+    "slug": "see see call call",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "sesecallcall",
+    "scheme": "see see call call",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {

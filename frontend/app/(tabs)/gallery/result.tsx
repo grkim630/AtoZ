@@ -1,12 +1,12 @@
 // app/gallery/result.tsx
 
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useRouter } from 'expo-router';
-import React from 'react';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Polygon } from 'react-native-svg';
-import { getLastAnalysisResult } from '@/src/services/analysisService';
+import { getSimulationOutcome } from '@/src/services/simulationOutcomeStore';
 
 const COLORS = {
     ROOT_BG: '#E5ECFF',      // 피그마 배경색
@@ -57,9 +57,25 @@ const RadarChart = () => (
 
 export default function ResultScreen() {
     const router = useRouter();
-    const result = getLastAnalysisResult();
-    const label = result?.label ?? 'normal';
-    const riskScore = result?.riskScore ?? 0;
+    const params = useLocalSearchParams<{ outcome?: string }>();
+    const outcomeParam = (params.outcome ?? 'unknown').toString();
+    const outcome = outcomeParam !== 'unknown' ? outcomeParam : getSimulationOutcome();
+
+    const { label, riskScore } = useMemo(() => {
+        const randomInt = (min: number, max: number) =>
+            Math.floor(Math.random() * (max - min + 1)) + min;
+
+        // 통화 체험 결과 기반 위험도:
+        // - 성공(안 걸림): 0~30
+        // - 실패(걸림): 70~90
+        if (outcome === 'success') return { label: 'normal' as const, riskScore: randomInt(0, 30) };
+        if (outcome === 'failure') return { label: 'phishing' as const, riskScore: randomInt(70, 90) };
+
+        // 강제 종료 등으로 불명확할 때도 "업로드 분석 점수"를 재사용하지 않음
+        const mid = randomInt(30, 60);
+        return { label: mid >= 60 ? ('phishing' as const) : ('normal' as const), riskScore: mid };
+    }, [outcome]);
+
     const scoreTone = label === 'phishing' ? COLORS.TEXT_DANGER : '#34C759';
 
     return (
@@ -83,7 +99,7 @@ export default function ResultScreen() {
                             현재 상태: <Text style={{ color: scoreTone, fontWeight: 'bold' }}>{label === 'phishing' ? '위험' : '안전'}</Text>
                         </Text>
                     </View>
-                    <TouchableOpacity style={styles.blueButton} onPress={() => router.push('/guide/steps')}>
+                    <TouchableOpacity style={styles.blueButton} onPress={() => router.push('/guide/category')}>
                         <Text style={styles.btnText}>대응안 확인하기</Text>
                     </TouchableOpacity>
                 </View>

@@ -97,21 +97,23 @@ print(predict_risk(text))
 ### API 서버 실행
 
 ```powershell
-.\.venv\Scripts\python.exe -m uvicorn api:app --host 127.0.0.1 --port 8010
+.\.venv\Scripts\python.exe -m uvicorn api:app --host 127.0.0.1 --port 8020
 ```
+
+> 참고: 이 모노레포의 `phishing_simulation` 서비스가 기본 `8010`을 사용합니다. 두 서비스를 동시에 실행하려면 `evaluation`은 다른 포트(예: `8020`)로 띄우는 것을 권장합니다.
 
 ### API 사용 예시
 
 - Health:
 
 ```powershell
-curl http://127.0.0.1:8010/health
+curl http://127.0.0.1:8020/health
 ```
 
 - Evaluate:
 
 ```powershell
-curl -X POST http://127.0.0.1:8010/evaluate -H "Content-Type: application/json" -d "{\"text\":\"검찰청입니다. 계좌가 범죄에 연루되어...\",\"already_clean\":false}"
+curl -X POST http://127.0.0.1:8020/evaluate -H "Content-Type: application/json" -d "{\"text\":\"검찰청입니다. 계좌가 범죄에 연루되어...\",\"already_clean\":false}"
 ```
 
 응답 예시(형태):
@@ -127,13 +129,13 @@ curl -X POST http://127.0.0.1:8010/evaluate -H "Content-Type: application/json" 
 1) `evaluation`에서 API 서버를 실행합니다.
 
 ```powershell
-.\.venv\Scripts\python.exe -m uvicorn api:app --host 127.0.0.1 --port 8010
+.\.venv\Scripts\python.exe -m uvicorn api:app --host 127.0.0.1 --port 8020
 ```
 
 2) `extraction/.env`에 아래를 추가합니다.
 
 ```env
-EVALUATION_API_URL=http://127.0.0.1:8010
+EVALUATION_API_URL=http://127.0.0.1:8020
 ```
 
 3) `extraction`을 실행하면, 파이프라인 중간에 모델 추론 결과가 자동으로 합쳐집니다.

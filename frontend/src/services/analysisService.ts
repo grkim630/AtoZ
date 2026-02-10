@@ -12,6 +12,7 @@ export interface AnalysisResult {
   verdictTitle: string;
   verdictDescription: string;
   comparisonData: ComparisonScore[];
+  keywords?: string[];
 }
 
 interface AnalyzeFileInput {
@@ -36,12 +37,18 @@ type PipelineResponse = {
   stageResults?: {
     extraction?: {
       summary?: string;
+      rawText?: string;
+      cleanText?: string;
+      keywords?: string[];
+      signals?: string[];
+      riskScore?: number;
     };
     classification?: {
       predictedType?: string;
       debug?: {
         riskLabel?: 'phishing' | 'normal';
         riskScore?: number; // backend: usually 0~1
+        reason?: string;
       };
     };
   };
@@ -62,6 +69,13 @@ function toRiskPercent(rawRiskScore: number) {
   // Backend can return either 0~1 or 0~100 depending on model/output.
   const normalized = rawRiskScore <= 1 ? rawRiskScore * 100 : rawRiskScore;
   return Math.floor(clamp(normalized, 0, 100));
+}
+
+function isMeaningfulText(text: string) {
+  const t = (text ?? '').trim();
+  if (!t) return false;
+  const meaningful = t.replace(/[^0-9A-Za-z가-힣]/g, '');
+  return meaningful.length >= 8;
 }
 
 function createRandomPairWithMean(mean: number) {
@@ -173,7 +187,33 @@ function mapPipelineToResult(pipeline: PipelineResponse): AnalysisResult {
   if (pipeline.status !== 'success') {
     throw new Error(pipeline.errorMessage ?? 'Analysis pipeline failed');
   }
+  const extraction = pipeline.stageResults?.extraction;
   const debug = pipeline.stageResults?.classification?.debug;
+  const extractedText =
+    String(extraction?.cleanText ?? extraction?.rawText ?? '').trim();
+
+  // If there is no meaningful extracted text, do not claim "high risk".
+  // Empty screenshots / blank photos should be treated as safe (or "cannot analyze").
+  if (!isMeaningfulText(extractedText)) {
+    const riskScore = 0;
+    const [wordBar, contextBar] = createRandomPairWithMean(riskScore);
+    return {
+      label: 'normal',
+      riskScore,
+      riskLevel: '안전',
+      statusMessage: '피싱에 안전합니다.',
+      verdictTitle: '텍스트를 찾지 못했어요',
+      verdictDescription:
+        '이미지에서 분석할 문장/단어가 감지되지 않았습니다. 실제 대화/문자 내용이 보이도록 다시 캡처하거나, 텍스트를 직접 붙여넣어 분석해보세요.',
+      comparisonData: [
+        { label: '단어', average: 0, user: wordBar },
+        { label: '문맥', average: 0, user: contextBar },
+        { label: '종합', average: 0, user: riskScore },
+      ],
+      keywords: extraction?.keywords ?? [],
+    };
+  }
+
   const label = debug?.riskLabel === 'phishing' ? 'phishing' : 'normal';
   const riskScore = toRiskPercent(Number(debug?.riskScore ?? 0));
   const predictedType = pipeline.stageResults?.classification?.predictedType;
@@ -203,6 +243,7 @@ function mapPipelineToResult(pipeline: PipelineResponse): AnalysisResult {
       { label: '문맥', average: averageRiskBar, user: contextBar },
       { label: '종합', average: averageRiskBar, user: riskScore },
     ],
+    keywords: extraction?.keywords ?? [],
   };
 }
 
