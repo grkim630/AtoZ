@@ -4,7 +4,6 @@ import React, { useEffect, useRef } from 'react';
 import {
   Animated,
   Dimensions,
-  Image,
   ImageBackground,
   Pressable,
   ScrollView,
@@ -20,17 +19,15 @@ import { MOCK_PHISHING_CASES, MOCK_STATS } from '@/src/services/mockData';
 
 const { width } = Dimensions.get('window');
 
+import LogoHeader from '../../assets/icons/logo_seeseecallcall-04 1.svg';
+
 // Header Component
 const Header = () => (
   <View style={styles.header}>
     <View style={styles.logoContainer}>
-      <Image
-        source={require('../../assets/images/logo_header.png')}
-        style={{ width: 120, height: 30, marginTop: 40 }} // Increased spacing and size adjustments if needed
-        resizeMode="contain"
-      />
+      <LogoHeader width={120} height={30} style={{ marginTop: 10 }} /> 
     </View>
-    <View style={[styles.headerRight, { marginTop: 40 }]}>
+    <View style={styles.headerRight}>
        <Icons.Alert.Type name={Icons.Alert.Name} size={24} color={Colors.gray} />
     </View>
   </View>
@@ -176,22 +173,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 15,
     backgroundColor: '#F3F5F9',
+    paddingTop: 60, // Add safe area spacing manually or rely on SafeAreaView edges
+    paddingBottom: 20,
   },
   logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'center',
   },
-  logoText: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#111',
-    marginRight: 4,
-  },
-  chatIcon: {
-      paddingTop: 4,
-  },
+
   headerRight: {
       //
   },

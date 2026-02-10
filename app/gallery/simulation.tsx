@@ -201,10 +201,11 @@ const styles = StyleSheet.create({
         fontSize: 16,
     },
     dialogueContainer: {
-        flex: 1,
-        justifyContent: 'center',
+        flex: 1, // acts as flexGrow in this context
+        flexGrow: 1, // User requested flexGrow: 1 explicitly
+        justifyContent: 'flex-end',
         paddingHorizontal: 20,
-        paddingBottom: 100,
+        paddingBottom: 200, // increased further to avoid overlap with hint text
     },
     bubbleLeft: {
         backgroundColor: 'rgba(255, 255, 255, 0.9)',
