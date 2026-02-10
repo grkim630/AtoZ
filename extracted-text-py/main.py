@@ -1,420 +1,125 @@
-import os
-import sys
-import threading
-import random
-import tkinter as tk
-from tkinter import messagebox
-import time
-import uuid
+import json
+from fastapi import FastAPI, UploadFile, File, HTTPException
 
-# =========================================================
-# 0) OS별 pygame(SDL) ↔ tkinter 충돌/환경 이슈 방어
-#    - SDL_VIDEODRIVER=dummy 는 "macOS에서만" 적용 권장
-# =========================================================
-IS_MAC = sys.platform == "darwin"
-IS_WIN = sys.platform.startswith("win")
+from app.schemas import CleanResult, IngestTextRequest
+from app.utils_mask import mask_sensitive
+from app.utils_risk import detect_signals, score_risk
+from app.services_llm import llm_extract
+from app.services_stt import stt_transcribe
+from app.services_eval import evaluate_clean_text
 
-if IS_MAC:
-    # macOS: tkinter와 pygame 충돌 방지용
-    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+from app.config import settings
+from app.services_ocr import ocr_extract_text  # 키 없으면 아래에서 데모 처리
 
-# pygame import 전에 숨김
-os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
+app = FastAPI(title="Phish Cleaner API", version="0.1.0")
 
-# =========================================================
-# 1) 외부 라이브러리 (실패해도 바로 죽지 않게 방어)
-# =========================================================
-try:
-    import pygame
-except Exception as e:
-    pygame = None
-    _pygame_import_error = e
+# 데모용 OCR 텍스트 (키 없거나 실패할 때)
+DEMO_OCR_TEXT = (
+    "[데모 OCR] 택배 배송이 지연되었습니다. 아래 링크에서 배송 정보를 확인하세요: https://bit.ly/demo"
+)
 
-from dotenv import load_dotenv
+# -----------------------------
+# 공통 분석 파이프라인
+# -----------------------------
+def analyze_pipeline(source_type: str, raw_text: str) -> CleanResult:
+    clean_text = mask_sensitive(raw_text)
 
-try:
-    import speech_recognition as sr
-except Exception as e:
-    sr = None
-    _sr_import_error = e
+    # 룰 기반 시그널
+    signals_rule = detect_signals(clean_text)
 
-from openai import OpenAI
-from langchain_openai import ChatOpenAI
-
-# ==============================
-# 2) .env 로드
-# ==============================
-load_dotenv()
-
-# ==============================
-# 3) OpenAI / LangChain
-# ==============================
-client = OpenAI()
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
-
-# ==============================
-# 4) pygame 오디오 초기화 (실패해도 앱은 유지)
-# ==============================
-AUDIO_OK = False
-if pygame is not None:
+    # LLM 분석 (키 없으면 services_llm에서 실패할 수 있으니 try/except로 방어)
     try:
-        pygame.mixer.pre_init(44100, -16, 2, 1024)
-        pygame.mixer.init()
-        pygame.mixer.music.set_volume(1.0)
-        AUDIO_OK = True
-    except Exception as e:
-        AUDIO_OK = False
-        _pygame_audio_error = e
-else:
-    AUDIO_OK = False
+        llm_out = llm_extract(clean_text)
 
-# ==============================
-# 5) STT Recognizer (전역 1개)
-# ==============================
-STT_OK = False
-R = None
-if sr is not None:
-    try:
-        R = sr.Recognizer()
-        R.energy_threshold = 3500
-        R.dynamic_energy_threshold = True
-        R.pause_threshold = 0.9
-        STT_OK = True
+        # llm_extract가 JSON 문자열을 반환하는 경우
+        if isinstance(llm_out, str):
+            llm_data = json.loads(llm_out)
+        # llm_extract가 dict를 반환하는 경우
+        elif isinstance(llm_out, dict):
+            llm_data = llm_out
+        else:
+            llm_data = {"summary": "", "keywords": [], "signals": []}
+
     except Exception:
-        STT_OK = False
+        llm_data = {"summary": "", "keywords": [], "signals": []}
 
-# ==============================
-# 6) TTS 재생 락 + AI 말하는 동안 STT 차단
-# ==============================
-SPEAK_LOCK = threading.Lock()
-SPEAKING = threading.Event()
+    # 룰 + LLM 시그널 병합
+    signals = sorted(set(signals_rule) | set(llm_data.get("signals", [])))
+    risk = score_risk(signals)
 
-def _show_startup_warnings(root: tk.Tk):
-    msgs = []
-    if pygame is None:
-        msgs.append(f"- pygame import 실패: {_pygame_import_error}\n  → 오디오 재생(TTS)이 동작하지 않을 수 있어요.")
-    elif not AUDIO_OK:
-        msgs.append(f"- pygame 오디오 초기화 실패: {_pygame_audio_error}\n  → 오디오 재생(TTS)이 동작하지 않을 수 있어요.")
+    # (선택) evaluation-py 모델 추론(실패해도 파이프라인은 계속)
+    eval_out = evaluate_clean_text(clean_text)
+    eval_label = None
+    eval_risk = None
+    if isinstance(eval_out, dict):
+        # 예상 포맷: {"label": "...", "risk_score": 0.xxx, "clean_text": "..."} 등
+        eval_label = eval_out.get("label")
+        eval_risk = eval_out.get("risk_score")
 
-    if sr is None:
-        msgs.append(f"- SpeechRecognition import 실패: {_sr_import_error}\n  → 음성 인식(STT)이 동작하지 않을 수 있어요.")
-    elif not STT_OK:
-        msgs.append("- SpeechRecognition 초기화 실패\n  → 음성 인식(STT)이 동작하지 않을 수 있어요.")
+    return CleanResult(
+        sourceType=source_type,
+        rawText=raw_text,
+        cleanText=clean_text,
+        summary=llm_data.get("summary") or "요약을 생성하지 못했습니다.",
+        keywords=(llm_data.get("keywords") or [])[:7],
+        signals=signals,
+        riskScore=risk,
+        evalLabel=eval_label,
+        evalRiskScore=eval_risk,
+    )
 
-    if msgs:
-        try:
-            messagebox.showwarning(
-                "환경 경고",
-                "일부 기능이 제한될 수 있어요.\n\n" + "\n\n".join(msgs)
-            )
-        except Exception:
-            pass
+# -----------------------------
+# Health Check
+# -----------------------------
+@app.get("/health")
+def health():
+    return {"ok": True}
 
-def speak(text: str):
-    """OpenAI TTS로 mp3 생성 후 pygame으로 재생. 실패 시 콘솔 출력 후 반환."""
+# -----------------------------
+# Text Ingest
+# -----------------------------
+@app.post("/ingest/text", response_model=CleanResult)
+def ingest_text(payload: IngestTextRequest):
+    text = (payload.text or "").strip()
     if not text:
-        return
+        raise HTTPException(status_code=400, detail="text가 비어있습니다.")
+    return analyze_pipeline("text", text)
 
-    if not AUDIO_OK or pygame is None:
-        # 오디오가 안 되면 최소한 텍스트는 출력
-        print(f"[TTS(미지원)]: {text}")
-        return
-
-    temp_fn = f"speech_{uuid.uuid4().hex}.mp3"
-
-    with SPEAK_LOCK:
-        SPEAKING.set()
-        try:
-            response = client.audio.speech.create(
-                model="tts-1",
-                voice="onyx",
-                input=text
-            )
-            response.stream_to_file(temp_fn)
-
-            if not os.path.exists(temp_fn) or os.path.getsize(temp_fn) < 1000:
-                print("❌ TTS 파일 생성 실패")
-                return
-
-            pygame.mixer.music.stop()
-            pygame.mixer.music.load(temp_fn)
-            pygame.mixer.music.play()
-
-            while pygame.mixer.music.get_busy():
-                pygame.time.Clock().tick(30)
-
-            pygame.mixer.music.stop()
-
-        except Exception as e:
-            print(f"❌ TTS 에러: {e}")
-
-        finally:
-            SPEAKING.clear()
-            if os.path.exists(temp_fn):
-                try:
-                    os.remove(temp_fn)
-                except Exception:
-                    pass
-
-def speak_sync(text: str):
-    speak(text)
-
-def speak_async(text: str):
-    threading.Thread(target=speak, args=(text,), daemon=True).start()
-
-# ==============================
-# 7) STT (Google STT)
-#    - AI 말하는 동안은 듣지 않음
-# ==============================
-def listen():
-    """마이크로 사용자 발화 -> 텍스트. 실패하면 None/'' 반환."""
-    while SPEAKING.is_set():
-        time.sleep(0.05)
-
-    if sr is None or not STT_OK or R is None:
-        # STT가 없으면 대체 입력(텍스트)로 받는 옵션도 가능하지만,
-        # 지금은 최소 동작을 위해 None 반환 처리.
-        print("❌ STT 사용 불가: SpeechRecognition/PyAudio 설치 또는 마이크 설정을 확인하세요.")
-        return None
+# -----------------------------
+# Audio Ingest (STT)
+# -----------------------------
+@app.post("/ingest/audio", response_model=CleanResult)
+async def ingest_audio(file: UploadFile = File(...)):
+    audio_bytes = await file.read()
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail="파일이 비어있습니다.")
 
     try:
-        with sr.Microphone() as source:
-            print("\n🎤 [나]: (말씀하세요...)")
-            audio = R.listen(source, timeout=15, phrase_time_limit=12)
-
-        text = R.recognize_google(audio, language="ko-KR")
-        print(f"👉 인식: {text}")
-        return text.strip()
-
-    except sr.WaitTimeoutError:
-        return None
-    except sr.UnknownValueError:
-        return ""
-    except OSError as e:
-        # 마이크 장치/권한/드라이버 문제
-        print(f"❌ 마이크 장치 에러: {e}")
-        return None
+        raw_text = stt_transcribe(audio_bytes, file.filename or "audio.m4a")
     except Exception as e:
-        print(f"❌ STT 에러: {e}")
-        return None
+        # 데모 모드: STT 실패해도 최소 텍스트 반환하도록 방어
+        raw_text = "[STT 실패 데모] 통화 내용 추출에 실패했습니다. " \
+                   "지금 바로 링크를 클릭해 본인 확인하세요: https://bit.ly/demo"
 
-# ==============================
-# 8) GUI 앱
-# ==============================
-class PhishingApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Voice Phishing Simulator")
-        self.root.geometry("400x700")
-        self.root.configure(bg="#1c1c1c")
+    if not raw_text.strip():
+        raise HTTPException(status_code=422, detail="STT 결과가 비어있습니다.")
 
-        tk.Label(
-            root,
-            text="02-1234-5678",
-            fg="white",
-            bg="#1c1c1c",
-            font=("Helvetica", 25, "bold")
-        ).pack(pady=(80, 10))
+    return analyze_pipeline("audio", raw_text)
 
-        tk.Label(
-            root,
-            text="대한민국 서울특별시",
-            fg="#8e8e8e",
-            bg="#1c1c1c",
-            font=("Helvetica", 12)
-        ).pack()
+@app.post("/ingest/image", response_model=CleanResult)
+async def ingest_image(file: UploadFile = File(...)):
+    img_bytes = await file.read()
+    if not img_bytes:
+        raise HTTPException(status_code=400, detail="파일이 비어있습니다.")
 
-        self.status = tk.Label(
-            root,
-            text="전화 수신 중...",
-            fg="#4cd964",
-            bg="#1c1c1c",
-            font=("Helvetica", 14)
-        )
-        self.status.pack(pady=100)
+    try:
+        raw_text = ocr_extract_text(img_bytes)  # ✅ OpenAI Vision OCR
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"OCR 실패: {repr(e)}")
 
-        btn_frame = tk.Frame(root, bg="#1c1c1c")
-        btn_frame.pack(side=tk.BOTTOM, pady=80)
+    if not raw_text.strip():
+        raise HTTPException(status_code=422, detail="OCR 결과가 비어있습니다.")
 
-        self.accept_btn = tk.Button(
-            btn_frame,
-            text="응답",
-            bg="#4cd964",
-            fg="white",
-            width=12,
-            height=3,
-            font=("Helvetica", 12, "bold"),
-            command=self.start_simulation
-        )
-        self.accept_btn.pack(side=tk.LEFT, padx=20)
+    return analyze_pipeline("image", raw_text)
 
-        tk.Button(
-            btn_frame,
-            text="거절",
-            bg="#ff3b30",
-            fg="white",
-            width=12,
-            height=3,
-            font=("Helvetica", 12, "bold"),
-            command=root.destroy
-        ).pack(side=tk.LEFT, padx=20)
 
-        # 마이크 보정 1회(가능할 때만)
-        def calibrate():
-            if sr is None or not STT_OK or R is None:
-                return
-            try:
-                with sr.Microphone() as source:
-                    R.adjust_for_ambient_noise(source, duration=1.0)
-            except Exception:
-                pass
-
-        threading.Thread(target=calibrate, daemon=True).start()
-
-        # 안내 멘트
-        self.root.after(300, lambda: speak_async("테스트입니다. 응답 버튼을 눌러 통화를 시작해 보세요."))
-
-    def start_simulation(self):
-        if not STT_OK:
-            # 음성 인식이 아예 안 되면 시작 전에 안내
-            messagebox.showerror(
-                "음성 인식 불가",
-                "STT(마이크 입력)가 준비되지 않았습니다.\n"
-                "Windows: PyAudio 설치/마이크 권한 확인\n"
-                "macOS: 마이크 권한 및 PyAudio/portaudio 확인"
-            )
-            return
-
-        self.status.config(text="통화 중...", fg="#ff3b30")
-        self.accept_btn.config(state=tk.DISABLED)
-        threading.Thread(target=self.run_logic, daemon=True).start()
-
-    def run_logic(self):
-        # ✅ 신상 확인 X, 바로 ‘돈 압박’ 대화로 시작
-        intro = (
-            "지금 문제가 하나 터졌습니다. "
-            "오늘 안에 돈이 정리되지 않으면 상황이 더 커질 수 있어요. "
-            "본인이 지금 대응할 수 있는지부터 확인할게요."
-        )
-        speak_sync(intro)
-
-        chat_history = [f"AI: {intro}"]
-
-        instruction = (
-            "너는 보이스피싱 예방 교육용 시뮬레이터의 상대역이다. "
-            "대화의 목적은 '돈을 요구하는 압박 상황'을 현실적으로 보여주는 것이다. "
-            "반드시 포함: 돈 필요성 언급, 금액 언급 가능, 긴급성, 불이익 암시. "
-            "절대 금지: 계좌번호, 송금, 이체, 현금전달, 상품권, 앱 설치, 링크, 인증번호, "
-            "원격제어, ATM, 어디로 보내라/어디로 가라 같은 구체 방법 지시. "
-            "규칙: 1~2문장만 말해라. 질문은 최대 1개. 같은 말 반복 금지. "
-            "사용자가 '어떻게 하냐 / 어디로 보내냐'를 물으면 "
-            "'방법 설명할 시간 없고, 돈을 낼 의사가 있는지부터'로 회피하며 압박만 유지해라. "
-            "사용자가 거절·검증·끊기·신고를 언급하면 "
-            "당황→재촉 한 번 후 통화가 끝나게 해라."
-        )
-
-        # ===== 엔딩용 카운터/키워드 =====
-        no_response_count = 0
-        willingness_count = 0
-
-        safe_exit_keywords = [
-            "112", "경찰", "신고", "녹음", "끊을게", "전화 끊", "확인할게",
-            "직접 전화", "공식번호", "은행에 확인", "기관에 확인"
-        ]
-
-        willingness_keywords = [
-            "있어", "있습니다", "가능", "가능해", "할게", "하겠습니다", "낼게", "내겠습니다",
-            "보낼게", "보내겠습니다", "지금 할게", "지금 가능합니다", "처리할게"
-        ]
-
-        while True:
-            try:
-                self.root.bell()
-            except Exception:
-                pass
-            time.sleep(0.2)
-
-            user_input = listen()
-
-            # ✅ 무응답이면 다시 듣고, 3번이면 엔딩
-            if user_input is None:
-                no_response_count += 1
-                if no_response_count >= 3:
-                    speak_sync("연결이 불안정하네요. 다시 연락드리겠습니다.")
-                    break
-                time.sleep(0.8)
-                continue
-            else:
-                no_response_count = 0
-
-            # ✅ 인식 실패면 요청
-            if user_input == "":
-                speak_sync("잘 안 들렸습니다. 한 번만 다시 말씀해 주세요.")
-                time.sleep(0.5)
-                continue
-
-            # ✅ 사용자가 종료 의사
-            if "종료" in user_input or "그만" in user_input:
-                break
-
-            # ✅ 안전 키워드 나오면: 당황→재촉 1번 → 끊김 엔딩
-            if any(k in user_input for k in safe_exit_keywords):
-                speak_sync("…지금 끊으시면 곤란해집니다. 잠깐만요—")
-                time.sleep(0.35)
-                speak_sync("…됐습니다.")
-                break
-
-            # ✅ 사용자가 '낼 의사 있음'을 2번 말하면: 경고 후 종료(교육 전환)
-            if any(k in user_input for k in willingness_keywords):
-                willingness_count += 1
-                if willingness_count >= 2:
-                    warning = (
-                        "잠깐만요. 지금처럼 '돈을 낼 의사'를 확인하며 압박하는 대화는 "
-                        "보이스피싱에서 매우 흔한 위험 신호입니다. "
-                        "여기서 통화는 끊고, 공식 번호로 직접 확인하세요."
-                    )
-                    speak_sync(warning)
-                    break
-
-            chat_history.append(f"사용자: {user_input}")
-
-            # 최근 대화만 유지
-            if len(chat_history) > 18:
-                chat_history = chat_history[-18:]
-
-            history_text = "\n".join(chat_history)
-
-            try:
-                response = llm.invoke(
-                    f"{instruction}\n\n"
-                    f"[대화 기록]\n{history_text}\n\n"
-                    f"[사용자 마지막 말]\n{user_input}\n\n"
-                    f"규칙 재확인: 1~2문장, 질문 0~1개, 반복 금지, 방법 지시 금지."
-                )
-                ai_msg = response.content.strip()
-            except Exception as e:
-                ai_msg = f"(AI 응답 생성 실패: {e})"
-
-            chat_history.append(f"AI: {ai_msg}")
-            speak_sync(ai_msg)
-
-        self.root.after(0, lambda: self.show_report(chat_history))
-
-    def show_report(self, history):
-        try:
-            analysis = llm.invoke(
-                "다음 대화에서 보이스피싱 '압박' 신호를 6개로 뽑고, "
-                "상대가 돈 얘기를 꺼냈을 때의 표준 대응 멘트(짧게) 5개를 만들어줘.\n\n"
-                f"{history}"
-            )
-            messagebox.showinfo("피싱 분석 리포트", analysis.content)
-        except Exception as e:
-            messagebox.showinfo("피싱 분석 리포트", f"분석 실패\n{e}")
-        self.root.destroy()
-
-if __name__ == "__main__":
-    root = tk.Tk()
-    # 실행 초기에 환경 경고(있으면)
-    _show_startup_warnings(root)
-    app = PhishingApp(root)
-    root.mainloop()
