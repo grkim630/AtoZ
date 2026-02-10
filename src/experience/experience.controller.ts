@@ -1,12 +1,15 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Get,
+  Post,
   Query,
   UseGuards,
 } from "@nestjs/common";
 import { ScriptType } from "@prisma/client";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { GenerateReplyDto } from "./dto/generate-reply.dto";
 import { ExperienceService } from "./experience.service";
 
 @Controller("experience")
@@ -36,5 +39,11 @@ export class ExperienceController {
     }
 
     return this.experienceService.getRandomScenario(keyword, parsedType);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("reply")
+  async generateReply(@Body() dto: GenerateReplyDto) {
+    return this.experienceService.generateChatReply(dto);
   }
 }

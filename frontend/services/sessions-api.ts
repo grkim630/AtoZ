@@ -1,0 +1,145 @@
+import { apiGet, apiPost } from "./backend-client";
+
+type ScenarioResponse = {
+  id: string;
+  type: "chat" | "call";
+  source: "scriptFile" | "ttsFile";
+  content?: string;
+  filePath?: string;
+  keyword: string;
+};
+
+type SessionResponse = {
+  id: string;
+  scriptId: string;
+  channel: "CHAT" | "CALL";
+};
+
+type SessionResult = {
+  sessionId: string;
+  status: string;
+  overallScore: number;
+  label: "A" | "B" | "C" | "D" | "E";
+  educationTips: string[];
+  categories: Array<{
+    categoryCode: string;
+    finalScore: number;
+    label: "A" | "B" | "C" | "D" | "E";
+  }>;
+};
+
+type ReplyRequestMessage = {
+  speaker: "USER" | "AGENT";
+  text: string;
+};
+
+type EvaluationJobResponse = {
+  evaluationJobId?: string;
+  status: "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED";
+};
+
+type EvaluationStatusResponse = {
+  evaluationJobId?: string;
+  status: "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED";
+  errorMessage?: string | null;
+};
+
+export async function fetchChatScenario(keyword = "택배") {
+  return apiGet<ScenarioResponse>(
+    `/experience/scenario?keyword=${encodeURIComponent(keyword)}&type=chat`,
+  );
+}
+
+export async function createChatSession(scriptId: string) {
+  return apiPost<SessionResponse>("/sessions", {
+    scriptId,
+    channel: "CHAT",
+    llmModelVersion: "gpt-4o-mini",
+    scriptVersion: 1,
+  });
+}
+
+export async function addSessionMessage(
+  sessionId: string,
+  payload: {
+    turnIndex: number;
+    speaker: "USER" | "AGENT";
+    text: string;
+    maskedText?: string;
+  },
+) {
+  return apiPost(`/sessions/${sessionId}/messages`, payload);
+}
+
+export async function addSessionEvent(
+  sessionId: string,
+  payload: {
+    eventType: "CHOICE" | "INPUT" | "HANGUP" | "REPORT";
+    actionCode: string;
+    riskWeight: number;
+    stepNo?: number;
+  },
+) {
+  return apiPost(`/sessions/${sessionId}/events`, payload);
+}
+
+export async function submitSurvey(
+  sessionId: string,
+  payload: {
+    realism: number;
+    helpfulness: number;
+    confidence: number;
+    riskyFactor: string;
+  },
+) {
+  return apiPost(`/sessions/${sessionId}/survey`, {
+    answersJson: payload,
+    isSkipped: false,
+  });
+}
+
+export async function runEvaluation(sessionId: string) {
+  const started = await apiPost<EvaluationJobResponse>(`/sessions/${sessionId}/evaluate`, {
+    promptVersion: "v1",
+    model: "gpt-4o-mini",
+  });
+
+  const jobId = started.evaluationJobId;
+  if (jobId) {
+    const maxAttempts = 20;
+    const intervalMs = 300;
+    let completed = false;
+
+    for (let i = 0; i < maxAttempts; i += 1) {
+      const status = await apiGet<EvaluationStatusResponse>(
+        `/sessions/${sessionId}/evaluation?jobId=${encodeURIComponent(jobId)}`,
+      );
+
+      if (status.status === "COMPLETED") {
+        completed = true;
+        break;
+      }
+      if (status.status === "FAILED") {
+        throw new Error(status.errorMessage ?? "Evaluation job failed");
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+
+    if (!completed) {
+      throw new Error("Evaluation timeout. Please try again.");
+    }
+  }
+
+  await apiPost(`/sessions/${sessionId}/finalize`, {});
+  return apiGet<SessionResult>(`/sessions/${sessionId}/result`);
+}
+
+export async function generateScammerReply(payload: {
+  sessionId?: string;
+  userMessage: string;
+  keyword?: string;
+  messages?: ReplyRequestMessage[];
+}) {
+  return apiPost<{ reply: string }>("/experience/reply", payload);
+}
