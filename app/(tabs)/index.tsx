@@ -4,6 +4,7 @@ import React, { useEffect, useRef } from 'react';
 import {
   Animated,
   Dimensions,
+  Image,
   ImageBackground,
   Pressable,
   ScrollView,
@@ -23,16 +24,13 @@ const { width } = Dimensions.get('window');
 const Header = () => (
   <View style={styles.header}>
     <View style={styles.logoContainer}>
-      <Text style={styles.logoText}>시시콜콜</Text>
-      <View style={styles.chatIcon}>
-        <Icons.Chat.Type
-          name={Icons.Chat.Name}
-          size={24}
-          color={Colors.primary}
-        />
-      </View>
+      <Image
+        source={require('../../assets/images/logo_header.png')}
+        style={{ width: 120, height: 30, marginTop: 40 }} // Increased spacing and size adjustments if needed
+        resizeMode="contain"
+      />
     </View>
-    <View style={styles.headerRight}>
+    <View style={[styles.headerRight, { marginTop: 40 }]}>
        <Icons.Alert.Type name={Icons.Alert.Name} size={24} color={Colors.gray} />
     </View>
   </View>
@@ -201,7 +199,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     marginTop: 10,
-    marginBottom: 25,
+    marginBottom: 38, // 25 * 1.5
   },
   ctaTitle: {
     fontSize: 22,
@@ -242,6 +240,7 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 18,
     fontWeight: 'bold',
+    fontFamily: 'Pretendard-Bold',
   },
   statsContainer: {
     flexDirection: 'row',
@@ -251,7 +250,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     paddingHorizontal: 10,
     borderRadius: 16,
-    marginBottom: 30,
+    marginBottom: 45, // 30 * 1.5
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -283,7 +282,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    marginBottom: 12,
+    marginBottom: 18, // 12 * 1.5
   },
   sectionTitleRow: {
     flexDirection: 'row',
@@ -304,7 +303,7 @@ const styles = StyleSheet.create({
   crimeCard: {
     marginHorizontal: 20,
     height: 150, // Fixed height for the banner
-    marginBottom: 30,
+    marginBottom: 45, // 30 * 1.5
     borderRadius: 16,
     overflow: 'hidden',
     justifyContent: 'flex-end',
