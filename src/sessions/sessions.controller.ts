@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { CreateSessionDto } from "./dto/create-session.dto";
@@ -66,8 +66,9 @@ export class SessionsController {
   async getEvaluation(
     @CurrentUser() user: { id: string },
     @Param("id") sessionId: string,
+    @Query("jobId") jobId?: string,
   ) {
-    return this.sessionsService.getEvaluation(user.id, sessionId);
+    return this.sessionsService.getEvaluation(user.id, sessionId, jobId);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url = env("DATABASE_URL")
 }
 
@@ -64,6 +64,13 @@ enum ScoreLabel {
 enum FeedbackQualityFlag {
   HIGH_CONFIDENCE
   NEEDS_REVIEW
+}
+
+enum EvaluationJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
 }
 
 model User {
@@ -180,6 +187,7 @@ model ExperienceSession {
   surveyResponse      SurveyResponse?
   categoryScores      SessionCategoryScore[]
   feedbackDatasets    LlmFeedbackDataset[]
+  evaluationJobs      SessionEvaluationJob[]
 
   @@index([userId, createdAt])
   @@index([scriptId, createdAt])
@@ -277,4 +285,21 @@ model LlmFeedbackDataset {
 
   @@index([sessionId, createdAt])
   @@index([qualityFlag, createdAt])
+}
+
+model SessionEvaluationJob {
+  id           String              @id @default(uuid())
+  sessionId    String
+  promptVersion String
+  model        String
+  status       EvaluationJobStatus @default(QUEUED)
+  errorMessage String?
+  completedAt  DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  session ExperienceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@index([status, createdAt])
 }

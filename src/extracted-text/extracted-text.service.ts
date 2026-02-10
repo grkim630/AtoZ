@@ -310,18 +310,12 @@ export class ExtractedTextService {
   }
 
   async getRandomExperienceByKeyword(keyword: string) {
-    const fixedKeyword = "택배";
-    // const fixedKeyword = keyword;
+    const fixedKeyword = keyword.trim();
     // const keywordPool = ["택배", "배송", "계좌", "인증"];
     // const fixedKeyword =
     //   keywordPool[Math.floor(Math.random() * keywordPool.length)];
 
     const candidates = await this.prisma.extractedText.findMany({
-      where: {
-        keywords: {
-          array_contains: [fixedKeyword],
-        },
-      },
       select: {
         id: true,
         summary: true,
@@ -330,12 +324,16 @@ export class ExtractedTextService {
         sourceType: true,
       },
     });
+    const filteredCandidates = candidates.filter((item) =>
+      this.hasKeyword(item.keywords, fixedKeyword),
+    );
 
-    if (candidates.length === 0) {
+    if (filteredCandidates.length === 0) {
       throw new NotFoundException("No extracted text found for keyword");
     }
 
-    const picked = candidates[Math.floor(Math.random() * candidates.length)];
+    const picked =
+      filteredCandidates[Math.floor(Math.random() * filteredCandidates.length)];
     const keywords = Array.isArray(picked.keywords)
       ? (picked.keywords as string[])
       : [];
@@ -369,5 +367,14 @@ export class ExtractedTextService {
       },
       orderBy: { createdAt: "desc" },
     });
+  }
+
+  private hasKeyword(keywords: unknown, keyword: string) {
+    if (!Array.isArray(keywords) || !keyword) {
+      return false;
+    }
+    return keywords.some(
+      (value) => typeof value === "string" && value.toLowerCase() === keyword.toLowerCase(),
+    );
   }
 }

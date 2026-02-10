@@ -17,6 +17,7 @@ import {
   addSessionMessage,
   createChatSession,
   fetchChatScenario,
+  generateScammerReply,
   runEvaluation,
   submitSurvey,
 } from "../../services/sessions-api";
@@ -29,23 +30,6 @@ type Msg = {
 };
 
 const uid = () => Math.random().toString(36).slice(2);
-
-function getScammerReply(step: number, userText: string) {
-  if (step === 0) {
-    if (/전화|통화|콜|call/i.test(userText)) {
-      return "지금 통화가 안돼… 급해. 기사님이 기다리고 있어. 계좌로 보내줘.";
-    }
-    return "응… 나 지금 급해. 폰 고장나서 새 폰이야. 100만 원만 먼저 보내줄 수 있어?";
-  }
-  if (step === 1) {
-    if (/아들|맞아|누구|이름|생일|확인/i.test(userText)) {
-      return "그건 나중에… 지금 기사님이 돈 먼저 달래. 빨리 보내줘 ㅠ";
-    }
-    return "계좌 보낼게. 일단 보내고 나중에 설명할게.";
-  }
-  if (step === 2) return "입금하면 캡처해서 보내줘. 엄마한테는 말하지 말고…";
-  return "지금 정말 급해. 부탁할게…";
-}
 
 export default function ChildImpersonationChat() {
   const router = useRouter();
@@ -74,6 +58,7 @@ export default function ChildImpersonationChat() {
   ]);
 
   const [input, setInput] = useState("");
+  const [waitingReply, setWaitingReply] = useState(false);
   const mySendCount = useMemo(
     () => messages.filter((m) => m.from === "me").length,
     [messages],
@@ -110,12 +95,14 @@ export default function ChildImpersonationChat() {
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 30);
   }, [messages.length]);
 
-  const send = () => {
+  const send = async () => {
     const text = input.trim();
     if (!text) return;
+    if (waitingReply) return;
 
     const myMsg: Msg = { id: uid(), from: "me", text, createdAt: Date.now() };
-    setMessages((prev) => [...prev, myMsg]);
+    const nextMessages = [...messages, myMsg];
+    setMessages(nextMessages);
     setInput("");
     const nextTurn = messages.length;
 
@@ -127,10 +114,21 @@ export default function ChildImpersonationChat() {
       }).catch((error) => setApiError(String(error)));
     }
 
-    const replyText = getScammerReply(mySendCount, text);
-    const delay = 650 + Math.floor(Math.random() * 600);
+    try {
+      setWaitingReply(true);
+      const history = nextMessages.map((item) => ({
+        speaker: item.from === "me" ? "USER" : "AGENT",
+        text: item.text,
+      })) as Array<{ speaker: "USER" | "AGENT"; text: string }>;
 
-    setTimeout(() => {
+      const generated = await generateScammerReply({
+        sessionId: sessionId ?? undefined,
+        userMessage: text,
+        keyword: "택배",
+        messages: history,
+      });
+      const replyText = generated.reply;
+
       setMessages((prev) => [
         ...prev,
         { id: uid(), from: "scammer", text: replyText, createdAt: Date.now() },
@@ -143,7 +141,11 @@ export default function ChildImpersonationChat() {
           text: replyText,
         }).catch((error) => setApiError(String(error)));
       }
-    }, delay);
+    } catch (error) {
+      setApiError(String(error));
+    } finally {
+      setWaitingReply(false);
+    }
   };
 
   const onBehaviorClick = (actionCode: string, riskWeight: number) => {
@@ -238,6 +240,8 @@ export default function ChildImpersonationChat() {
           <Text style={styles.statusText}>
             {loadingSession
               ? "세션 연결 중..."
+              : waitingReply
+                ? "상대방 응답 생성 중..."
               : sessionId
                 ? `세션 연결됨: ${sessionId.slice(0, 8)}`
                 : "세션 생성 실패"}

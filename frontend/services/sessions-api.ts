@@ -28,6 +28,22 @@ type SessionResult = {
   }>;
 };
 
+type ReplyRequestMessage = {
+  speaker: "USER" | "AGENT";
+  text: string;
+};
+
+type EvaluationJobResponse = {
+  evaluationJobId?: string;
+  status: "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED";
+};
+
+type EvaluationStatusResponse = {
+  evaluationJobId?: string;
+  status: "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED";
+  errorMessage?: string | null;
+};
+
 export async function fetchChatScenario(keyword = "택배") {
   return apiGet<ScenarioResponse>(
     `/experience/scenario?keyword=${encodeURIComponent(keyword)}&type=chat`,
@@ -83,10 +99,47 @@ export async function submitSurvey(
 }
 
 export async function runEvaluation(sessionId: string) {
-  await apiPost(`/sessions/${sessionId}/evaluate`, {
+  const started = await apiPost<EvaluationJobResponse>(`/sessions/${sessionId}/evaluate`, {
     promptVersion: "v1",
     model: "gpt-4o-mini",
   });
+
+  const jobId = started.evaluationJobId;
+  if (jobId) {
+    const maxAttempts = 20;
+    const intervalMs = 300;
+    let completed = false;
+
+    for (let i = 0; i < maxAttempts; i += 1) {
+      const status = await apiGet<EvaluationStatusResponse>(
+        `/sessions/${sessionId}/evaluation?jobId=${encodeURIComponent(jobId)}`,
+      );
+
+      if (status.status === "COMPLETED") {
+        completed = true;
+        break;
+      }
+      if (status.status === "FAILED") {
+        throw new Error(status.errorMessage ?? "Evaluation job failed");
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+
+    if (!completed) {
+      throw new Error("Evaluation timeout. Please try again.");
+    }
+  }
+
   await apiPost(`/sessions/${sessionId}/finalize`, {});
   return apiGet<SessionResult>(`/sessions/${sessionId}/result`);
+}
+
+export async function generateScammerReply(payload: {
+  sessionId?: string;
+  userMessage: string;
+  keyword?: string;
+  messages?: ReplyRequestMessage[];
+}) {
+  return apiPost<{ reply: string }>("/experience/reply", payload);
 }

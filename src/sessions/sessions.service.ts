@@ -4,7 +4,12 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { CategoryCode, SessionStatus } from "@prisma/client";
+import {
+  CategoryCode,
+  EvaluationJobStatus,
+  Prisma,
+  SessionStatus,
+} from "@prisma/client/index";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateSessionDto } from "./dto/create-session.dto";
 import { CreateSessionEventDto } from "./dto/create-session-event.dto";
@@ -94,99 +99,82 @@ export class SessionsService {
   }
 
   async evaluateSession(userId: string, sessionId: string, dto: EvaluateSessionDto) {
-    const session = await this.getOwnedSession(userId, sessionId);
-    const [events, messageLogs] = await Promise.all([
-      this.prisma.sessionActionEvent.findMany({
-        where: { sessionId },
-        orderBy: { timestamp: "asc" },
-      }),
-      this.prisma.sessionMessageLog.findMany({
-        where: { sessionId },
-        orderBy: { turnIndex: "asc" },
-      }),
-    ]);
+    await this.getOwnedSession(userId, sessionId);
+    const promptVersion = dto.promptVersion ?? "v1";
+    const model = dto.model ?? "gpt-4o-mini";
 
-    const evaluated = await this.sessionEvaluatorService.evaluate({
-      scriptType: session.script.type,
-      scriptContent:
-        typeof session.script.script === "string"
-          ? session.script.script
-          : JSON.stringify(session.script.script),
-      messageLogs: messageLogs.map((message) => ({
-        speaker: message.speaker,
-        text: message.text,
-        maskedText: message.maskedText,
-      })),
-      actionEvents: events.map((event) => ({
-        eventType: event.eventType,
-        actionCode: event.actionCode,
-        riskWeight: event.riskWeight,
-        stepNo: event.stepNo,
-      })),
-      promptVersion: dto.promptVersion ?? "v1",
-      model: dto.model ?? "gpt-4o-mini",
+    const job = await this.prisma.sessionEvaluationJob.create({
+      data: {
+        sessionId,
+        promptVersion,
+        model,
+        status: EvaluationJobStatus.QUEUED,
+      },
     });
 
-    const outputJson = {
-      overallScore: evaluated.overallScore,
-      confidence: evaluated.confidence,
-      categories: evaluated.categories,
-      educationMessage: evaluated.educationMessage,
-      meta: {
-        mode: evaluated.mode,
-        modelUsed: evaluated.modelUsed,
-      },
-    };
-
-    const evaluation = await this.prisma.llmBehaviorEvaluation.upsert({
-      where: { sessionId },
-      create: {
-        sessionId,
-        promptVersion: dto.promptVersion ?? "v1",
-        model: evaluated.modelUsed,
-        outputJson,
-        overallScore: evaluated.overallScore,
-        confidence: evaluated.confidence,
-      },
-      update: {
-        promptVersion: dto.promptVersion ?? "v1",
-        model: evaluated.modelUsed,
-        outputJson,
-        overallScore: evaluated.overallScore,
-        confidence: evaluated.confidence,
-        createdAt: new Date(),
-      },
+    void this.runEvaluationJob(job.id).catch(async (error) => {
+      await this.prisma.sessionEvaluationJob.update({
+        where: { id: job.id },
+        data: {
+          status: EvaluationJobStatus.FAILED,
+          errorMessage: String(error),
+          completedAt: new Date(),
+        },
+      });
     });
 
     return {
-      evaluationId: evaluation.id,
-      overallScore: evaluation.overallScore,
-      confidence: evaluation.confidence,
-      outputJson: evaluation.outputJson,
+      evaluationJobId: job.id,
+      status: job.status,
     };
   }
 
-  async getEvaluation(userId: string, sessionId: string) {
+  async getEvaluation(userId: string, sessionId: string, jobId?: string) {
     await this.getOwnedSession(userId, sessionId);
-    const evaluation = await this.prisma.llmBehaviorEvaluation.findUnique({
-      where: { sessionId },
-    });
-    if (!evaluation) {
+
+    const job = await this.getEvaluationJob(sessionId, jobId);
+    const evaluation = await this.prisma.llmBehaviorEvaluation.findUnique({ where: { sessionId } });
+
+    if (!job && !evaluation) {
       throw new NotFoundException("Evaluation not found");
     }
-    return evaluation;
+    if (!job) {
+      return {
+        status: EvaluationJobStatus.COMPLETED,
+        evaluation,
+      };
+    }
+
+    return {
+      evaluationJobId: job.id,
+      status: job.status,
+      errorMessage: job.errorMessage,
+      createdAt: job.createdAt,
+      completedAt: job.completedAt,
+      evaluation: job.status === EvaluationJobStatus.COMPLETED ? evaluation : null,
+    };
   }
 
   async finalizeSession(userId: string, sessionId: string) {
     await this.getOwnedSession(userId, sessionId);
+    const activeJob = await this.prisma.sessionEvaluationJob.findFirst({
+      where: {
+        sessionId,
+        status: { in: [EvaluationJobStatus.QUEUED, EvaluationJobStatus.RUNNING] },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    if (activeJob) {
+      throw new BadRequestException(
+        "Evaluation is still in progress. Retry finalize after evaluation completes.",
+      );
+    }
+
     let evaluation = await this.prisma.llmBehaviorEvaluation.findUnique({
       where: { sessionId },
     });
     if (!evaluation) {
-      const generated = await this.evaluateSession(userId, sessionId, {});
-      evaluation = await this.prisma.llmBehaviorEvaluation.findUnique({
-        where: { id: generated.evaluationId },
-      });
+      evaluation = await this.evaluateAndPersist(sessionId, "v1", "gpt-4o-mini");
     }
     if (!evaluation) {
       throw new BadRequestException("Failed to evaluate session");
@@ -309,5 +297,138 @@ export class SessionsService {
       throw new ForbiddenException("You do not have access to this session");
     }
     return session;
+  }
+
+  private async getEvaluationJob(sessionId: string, jobId?: string) {
+    if (jobId) {
+      return this.prisma.sessionEvaluationJob.findFirst({
+        where: {
+          id: jobId,
+          sessionId,
+        },
+      });
+    }
+    return this.prisma.sessionEvaluationJob.findFirst({
+      where: { sessionId },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  private async runEvaluationJob(jobId: string) {
+    const job = await this.prisma.sessionEvaluationJob.findUnique({
+      where: { id: jobId },
+    });
+    if (!job) {
+      throw new NotFoundException("Evaluation job not found");
+    }
+
+    await this.prisma.sessionEvaluationJob.update({
+      where: { id: jobId },
+      data: {
+        status: EvaluationJobStatus.RUNNING,
+        errorMessage: null,
+      },
+    });
+
+    try {
+      await this.evaluateAndPersist(job.sessionId, job.promptVersion, job.model);
+      await this.prisma.sessionEvaluationJob.update({
+        where: { id: jobId },
+        data: {
+          status: EvaluationJobStatus.COMPLETED,
+          completedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      await this.prisma.sessionEvaluationJob.update({
+        where: { id: jobId },
+        data: {
+          status: EvaluationJobStatus.FAILED,
+          errorMessage: String(error),
+          completedAt: new Date(),
+        },
+      });
+      throw error;
+    }
+  }
+
+  private async evaluateAndPersist(sessionId: string, promptVersion: string, model: string) {
+    const session = await this.prisma.experienceSession.findUnique({
+      where: { id: sessionId },
+      include: {
+        script: {
+          select: {
+            type: true,
+            script: true,
+          },
+        },
+      },
+    });
+    if (!session) {
+      throw new NotFoundException("Session not found");
+    }
+
+    const [events, messageLogs] = await Promise.all([
+      this.prisma.sessionActionEvent.findMany({
+        where: { sessionId },
+        orderBy: { timestamp: "asc" },
+      }),
+      this.prisma.sessionMessageLog.findMany({
+        where: { sessionId },
+        orderBy: { turnIndex: "asc" },
+      }),
+    ]);
+
+    const evaluated = await this.sessionEvaluatorService.evaluate({
+      scriptType: session.script.type,
+      scriptContent:
+        typeof session.script.script === "string"
+          ? session.script.script
+          : JSON.stringify(session.script.script),
+      messageLogs: messageLogs.map((message) => ({
+        speaker: message.speaker,
+        text: message.text,
+        maskedText: message.maskedText,
+      })),
+      actionEvents: events.map((event) => ({
+        eventType: event.eventType,
+        actionCode: event.actionCode,
+        riskWeight: event.riskWeight,
+        stepNo: event.stepNo,
+      })),
+      promptVersion,
+      model,
+    });
+
+    const outputJson: Prisma.JsonObject = {
+      overallScore: evaluated.overallScore,
+      confidence: evaluated.confidence,
+      categories: evaluated.categories as unknown as Prisma.JsonArray,
+      educationMessage: evaluated.educationMessage as unknown as Prisma.JsonObject,
+      meta: {
+        mode: evaluated.mode,
+        modelUsed: evaluated.modelUsed,
+      },
+    };
+
+    return this.prisma.llmBehaviorEvaluation.upsert({
+      where: { sessionId },
+      create: {
+        sessionId,
+        promptVersion,
+        model: evaluated.modelUsed,
+        outputJson,
+        overallScore: evaluated.overallScore,
+        confidence: evaluated.confidence,
+      },
+      update: {
+        promptVersion,
+        model: evaluated.modelUsed,
+        outputJson,
+        overallScore: evaluated.overallScore,
+        confidence: evaluated.confidence,
+        createdAt: new Date(),
+      },
+    });
   }
 }

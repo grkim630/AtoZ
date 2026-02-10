@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { MiddlewareConsumer, Module, NestModule, RequestMethod } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
@@ -13,6 +13,8 @@ import { TtsModule } from "./tts/tts.module";
 import { LogsModule } from "./logs/logs.module";
 import { ExperienceModule } from "./experience/experience.module";
 import { SessionsModule } from "./sessions/sessions.module";
+import { LlmFeedbackModule } from "./llm-feedback/llm-feedback.module";
+import { RequestLoggingMiddleware } from "./common/middleware/request-logging.middleware";
 
 @Module({
   imports: [
@@ -30,8 +32,15 @@ import { SessionsModule } from "./sessions/sessions.module";
     LogsModule,
     ExperienceModule,
     SessionsModule,
+    LlmFeedbackModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(RequestLoggingMiddleware)
+      .forRoutes({ path: "*", method: RequestMethod.ALL });
+  }
+}
