@@ -1,0 +1,305 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum UploadType {
+  VOICE
+  IMAGE
+  TEXT
+}
+
+enum ScriptType {
+  CHAT
+  CALL
+}
+
+enum SessionChannel {
+  CHAT
+  CALL
+}
+
+enum SessionStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+enum MessageSpeaker {
+  USER
+  AGENT
+}
+
+enum ActionEventType {
+  CHOICE
+  INPUT
+  HANGUP
+  REPORT
+}
+
+enum CategoryCode {
+  DETECT_SIGNAL
+  REFUSE_REQUEST
+  VERIFY_IDENTITY
+  REPORTING
+}
+
+enum ScoreLabel {
+  A
+  B
+  C
+  D
+  E
+}
+
+enum FeedbackQualityFlag {
+  HIGH_CONFIDENCE
+  NEEDS_REVIEW
+}
+
+enum EvaluationJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id        String           @id @default(uuid())
+  email     String           @unique
+  password  String
+  name      String?
+  role      UserRole         @default(USER)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  uploadedFiles   UploadedFile[]
+  experienceLogs  ExperienceLog[]
+  sessions        ExperienceSession[]
+}
+
+model UploadedFile {
+  id        String      @id @default(uuid())
+  userId    String
+  type      UploadType
+  originalName String
+  storedPath  String
+  size      Int
+  mimeType  String
+  createdAt DateTime    @default(now())
+
+  user           User           @relation(fields: [userId], references: [id])
+  extractedText  ExtractedText?
+}
+
+model ExtractedText {
+  id            String     @id @default(uuid())
+  uploadedFileId String    @unique
+  sourceType    String
+  rawText       String
+  cleanText     String
+  summary       String
+  keywords      Json
+  signals       Json
+  riskScore     Int
+  createdAt     DateTime   @default(now())
+
+  uploadedFile  UploadedFile @relation(fields: [uploadedFileId], references: [id])
+  summaryRecord Summary?
+}
+
+model Summary {
+  id             String     @id @default(uuid())
+  extractedTextId String    @unique
+  summary        String
+  keywords       Json
+  createdAt      DateTime   @default(now())
+
+  extractedText  ExtractedText @relation(fields: [extractedTextId], references: [id])
+  scripts        ExperienceScript[]
+}
+
+model ExperienceScript {
+  id        String     @id @default(uuid())
+  summaryId String
+  type      ScriptType
+  script    Json
+  createdAt DateTime   @default(now())
+
+  summary   Summary   @relation(fields: [summaryId], references: [id])
+  ttsFile   TtsFile?
+  logs      ExperienceLog[]
+  sessions  ExperienceSession[]
+
+  @@unique([summaryId, type])
+}
+
+model TtsFile {
+  id        String   @id @default(uuid())
+  scriptId  String   @unique
+  storedPath String
+  createdAt DateTime @default(now())
+
+  script    ExperienceScript @relation(fields: [scriptId], references: [id])
+  logs      ExperienceLog[]
+}
+
+model ExperienceLog {
+  id        String   @id @default(uuid())
+  userId    String
+  scriptId  String
+  ttsFileId String?
+  log       Json
+  createdAt DateTime @default(now())
+
+  user      User             @relation(fields: [userId], references: [id])
+  script    ExperienceScript @relation(fields: [scriptId], references: [id])
+  ttsFile   TtsFile?          @relation(fields: [ttsFileId], references: [id])
+}
+
+model ExperienceSession {
+  id              String                     @id @default(uuid())
+  userId          String
+  scriptId        String
+  channel         SessionChannel
+  status          SessionStatus              @default(IN_PROGRESS)
+  startedAt       DateTime                   @default(now())
+  endedAt         DateTime?
+  scriptVersion   Int?
+  llmModelVersion String?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+
+  user                User                     @relation(fields: [userId], references: [id])
+  script              ExperienceScript         @relation(fields: [scriptId], references: [id])
+  messageLogs         SessionMessageLog[]
+  actionEvents        SessionActionEvent[]
+  llmBehaviorEval     LlmBehaviorEvaluation?
+  surveyResponse      SurveyResponse?
+  categoryScores      SessionCategoryScore[]
+  feedbackDatasets    LlmFeedbackDataset[]
+  evaluationJobs      SessionEvaluationJob[]
+
+  @@index([userId, createdAt])
+  @@index([scriptId, createdAt])
+  @@index([status, createdAt])
+}
+
+model SessionMessageLog {
+  id         String          @id @default(uuid())
+  sessionId  String
+  turnIndex  Int
+  speaker    MessageSpeaker
+  text       String
+  maskedText String
+  timestamp  DateTime        @default(now())
+  createdAt  DateTime        @default(now())
+
+  session ExperienceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, turnIndex])
+  @@index([sessionId, timestamp])
+}
+
+model SessionActionEvent {
+  id         String          @id @default(uuid())
+  sessionId  String
+  eventType  ActionEventType
+  actionCode String
+  riskWeight Float
+  stepNo     Int?
+  timestamp  DateTime        @default(now())
+  createdAt  DateTime        @default(now())
+
+  session ExperienceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, timestamp])
+  @@index([sessionId, eventType])
+  @@index([actionCode, createdAt])
+}
+
+model LlmBehaviorEvaluation {
+  id           String   @id @default(uuid())
+  sessionId    String   @unique
+  promptVersion String
+  model        String
+  outputJson   Json
+  overallScore Int
+  confidence   Float
+  createdAt    DateTime @default(now())
+
+  session ExperienceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+}
+
+model SurveyResponse {
+  id          String   @id @default(uuid())
+  sessionId   String   @unique
+  answersJson Json
+  isSkipped   Boolean  @default(false)
+  submittedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  session ExperienceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([submittedAt])
+}
+
+model SessionCategoryScore {
+  id            String       @id @default(uuid())
+  sessionId     String
+  categoryCode  CategoryCode
+  behaviorScore Int
+  llmScore      Int
+  surveyScore   Int?
+  finalScore    Int
+  label         ScoreLabel
+  createdAt     DateTime     @default(now())
+
+  session ExperienceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, categoryCode])
+  @@index([categoryCode, finalScore])
+}
+
+model LlmFeedbackDataset {
+  id               String              @id @default(uuid())
+  sessionId        String
+  inputFeaturesJson Json
+  targetLabelJson  Json
+  qualityFlag      FeedbackQualityFlag
+  reviewerId       String?
+  createdAt        DateTime            @default(now())
+
+  session ExperienceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@index([qualityFlag, createdAt])
+}
+
+model SessionEvaluationJob {
+  id           String              @id @default(uuid())
+  sessionId    String
+  promptVersion String
+  model        String
+  status       EvaluationJobStatus @default(QUEUED)
+  errorMessage String?
+  completedAt  DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  session ExperienceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@index([status, createdAt])
+}

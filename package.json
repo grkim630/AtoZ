@@ -1,0 +1,35 @@
+{
+  "name": "phishing-experience-monorepo",
+  "private": true,
+  "scripts": {
+    "start": "npm --prefix backend/server run start",
+    "start:dev": "npm --prefix backend/server run start:dev",
+    "start:debug": "npm --prefix backend/server run start:debug",
+    "start:prod": "npm --prefix backend/server run start:prod",
+    "build": "npm --prefix backend/server run build",
+    "format": "npm --prefix backend/server run format",
+    "lint": "npm --prefix backend/server run lint",
+    "test": "npm --prefix backend/server run test",
+    "test:watch": "npm --prefix backend/server run test:watch",
+    "test:cov": "npm --prefix backend/server run test:cov",
+    "test:debug": "npm --prefix backend/server run test:debug",
+    "test:e2e": "npm --prefix backend/server run test:e2e",
+    "typecheck": "npm --prefix backend/server run typecheck",
+    "typecheck:watch": "npm --prefix backend/server run typecheck:watch",
+    "db:generate": "npm --prefix backend/server run db:generate",
+    "db:migrate": "npm --prefix backend/server run db:migrate",
+    "db:migrate:dev": "npm --prefix backend/server run db:migrate:dev",
+    "db:studio": "npm --prefix backend/server run db:studio",
+
+    "frontend:start": "npm --prefix frontend run start",
+    "frontend:android": "npm --prefix frontend run android",
+    "frontend:ios": "npm --prefix frontend run ios",
+    "frontend:web": "npm --prefix frontend run web",
+    "frontend:lint": "npm --prefix frontend run lint",
+
+    "install:backend": "npm --prefix backend/server install",
+    "install:frontend": "npm --prefix frontend install",
+    "postinstall": "npm run install:backend && npm run install:frontend"
+  }
+}
+
